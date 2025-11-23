@@ -1,6 +1,6 @@
 {
   "name": "web-otp",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "description": "A web application for one-time password.",
   "scripts": {
     "dev": "pnpm -r --parallel dev",
