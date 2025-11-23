@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useAuthStore, initializeAuthState } from './stores/auth.store';
@@ -10,17 +10,33 @@ import LanguageSwitcher from './components/common/LanguageSwitcher';
 function App() {
   const { isAuthenticated } = useAuthStore();
   const { t } = useTranslation();
+  const [authInitializing, setAuthInitializing] = useState(true);
 
   useEffect(() => {
     // Ensure theme setting is applied
     applyThemeClass();
-    // Initialize state after successful authentication (delayed until after login)
-    if (isAuthenticated) {
-      initializeAuthState().catch(e => {
-        console.warn('Failed to initialize user data:', e);
+
+    // Always initialize auth state on app start to verify tokens
+    initializeAuthState()
+      .catch(e => {
+        console.warn('Failed to initialize authentication state:', e);
+      })
+      .finally(() => {
+        setAuthInitializing(false);
       });
-    }
-  }, [isAuthenticated]);
+  }, []);
+
+  // Show loading screen while checking authentication state
+  if (authInitializing) {
+    return (
+      <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
+          <p className="mt-2 text-gray-600 dark:text-gray-400">Initializing...</p>
+        </div>
+      </div>
+    );
+  }
 
   if (!isAuthenticated) {
     return (

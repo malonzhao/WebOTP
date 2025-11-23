@@ -131,6 +131,16 @@ export const useAuthStore: any = create(
         updateUsernameError: null,
         updateUsernameSuccess: false,
       }),
+
+      handleTokenExpired: () => {
+        // Clear all authentication state when token expires
+        AuthService.clearTokens();
+        set({
+          isAuthenticated: false,
+          tokens: null,
+          user: null,
+        });
+      },
     }),
     {
       name: 'auth-storage',

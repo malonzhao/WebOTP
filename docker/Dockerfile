@@ -31,6 +31,7 @@ COPY docker/entrypoint.sh ./
 ENV NODE_ENV=production
 ENV HOME=/root
 ENV DATABASE_URL=file:${HOME}/.otp/otp.db
+ENV JWT_EXPIRES_IN=1800s
 
 EXPOSE 80
 

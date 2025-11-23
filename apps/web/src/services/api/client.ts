@@ -61,10 +61,13 @@ class ApiClient {
             originalRequest.headers.Authorization = `Bearer ${accessToken}`;
             return this.client(originalRequest);
           } catch (refreshError) {
-            // Clear tokens and redirect to login on refresh failure
+            // Clear tokens on refresh failure - let React handle authentication state
             localStorage.removeItem('accessToken');
             localStorage.removeItem('refreshToken');
-            window.location.href = '/login';
+
+            // Trigger global auth token expired event
+            window.dispatchEvent(new CustomEvent('auth-token-expired'));
+
             return Promise.reject(refreshError);
           }
         }
