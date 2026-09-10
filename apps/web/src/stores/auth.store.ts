@@ -61,7 +61,7 @@ export const useAuthStore: any = create(
             isAuthenticated: false,
             user: null
           });
-        } catch (error) {
+        } catch {
           AuthService.clearTokens();
           set({
             tokens: null,

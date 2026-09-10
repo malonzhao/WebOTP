@@ -1,20 +1,22 @@
 # Single build stage for unified build
-FROM --platform=$BUILDPLATFORM node:22-alpine AS builder
+FROM node:22-alpine AS builder
 ENV CI=true
 WORKDIR /repo
 
-# Copy all project files
-COPY . .
-
-# Install dependencies and build both projects
+# Cache dependency installation independently of application source.
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
+COPY apps/api/package.json apps/api/package.json
+COPY apps/web/package.json apps/web/package.json
+COPY packages/shared/package.json packages/shared/package.json
 RUN npm install -g "$(node -p "require('./package.json').packageManager")"
 RUN pnpm install --frozen-lockfile
+COPY . .
 RUN pnpm -F @webotp/api prisma:generate
 RUN pnpm build
 RUN pnpm deploy --filter @webotp/api --prod --legacy dist
 
 # Final image with nginx and supervisor
-FROM --platform=$BUILDPLATFORM node:22-alpine
+FROM node:22-alpine
 RUN apk update && apk add --no-cache nginx supervisor
 RUN rm -rf /var/cache/apk/* /tmp/*
 WORKDIR /app

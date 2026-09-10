@@ -7,7 +7,6 @@ import {
 } from "@nestjs/common";
 import { UsersRepository } from "./users.repository";
 import { UpdatePasswordDto } from "./dto/update-password.dto";
-import { UpdateUsernameDto } from "./dto/update-username.dto";
 import * as bcrypt from "bcrypt";
 import { User } from '../../generated/prisma';
 import { I18nService } from "../i18n/i18n.service";

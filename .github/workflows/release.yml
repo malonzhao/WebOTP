@@ -1,95 +1,100 @@
-name: Release and Containerization
+name: Release
 
 on:
   push:
-    branches:
-      - main
-  workflow_dispatch:
+    tags: ['v*']
 
 permissions:
-  contents: write
-  packages: write
+  contents: read
+
+# Never interrupt a publication after it has started writing artifacts.
+concurrency:
+  group: webotp-release
+  cancel-in-progress: false
 
 jobs:
-  release:
-    runs-on: ubuntu-latest
+  validate:
+    uses: ./.github/workflows/ci.yml
 
+  release:
+    needs: validate
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    permissions:
+      contents: write
+      packages: write
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
         with:
           fetch-depth: 0
+          persist-credentials: false
 
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: 22.x
-          registry-url: https://registry.npmjs.org/
-
-      - name: Determine version bump
-        id: version
+      - name: Validate release tag
+        env:
+          TAG: ${{ github.ref_name }}
         run: |
-          COMMITS=$(git log -1 --pretty=%B)
-          if [[ "$COMMITS" == *"BREAKING CHANGE"* ]]; then
-            echo "version_type=major" >> $GITHUB_ENV
-          elif [[ "$COMMITS" == *feat* ]]; then
-            echo "version_type=minor" >> $GITHUB_ENV
-          elif [[ "$COMMITS" == *fix* ]]; then
-            echo "version_type=patch" >> $GITHUB_ENV
-          else
-            echo "version_type=patch" >> $GITHUB_ENV
-          fi
-          echo "Detected version bump: $version_type"
+          set -euo pipefail
+          version=$(node -p "require('./package.json').version")
+          [[ "$TAG" =~ ^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$ ]] || { echo 'Expected a stable vMAJOR.MINOR.PATCH tag'; exit 1; }
+          [[ "$TAG" == "v$version" ]] || { echo 'Tag does not match package.json'; exit 1; }
+          git merge-base --is-ancestor HEAD origin/main || { echo 'Release commit must belong to main'; exit 1; }
+          echo "IMAGE=ghcr.io/${GITHUB_REPOSITORY_OWNER,,}/webotp" >> "$GITHUB_ENV"
 
-      - name: Bump versions in subprojects
-        run: |
-          npm version ${{ env.version_type }} --no-git-tag-version
-          echo "APP_VERSION=$(jq -r .version package.json)" >> $GITHUB_ENV
-
-      - name: Commit version bump
-        run: |
-          git config user.name "${{ github.actor }}"
-          git config user.email "${{ github.actor }}@users.noreply.github.com"
-          git add package.json
-          git commit -m "chore(release): bump ${{ env.version_type }} version [skip ci]" || echo "No changes to commit"
-          git push origin HEAD:main
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-
-      - name: Log in to GitHub Container Registry
-        uses: docker/login-action@v3
+      - uses: docker/setup-qemu-action@v3
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/login-action@v3
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Determine image name
-        id: image
-        shell: bash
+      - name: Check for an already published version
+        id: existing
+        env:
+          TAG: ${{ github.ref_name }}
+          GH_TOKEN: ${{ github.token }}
         run: |
-          image_owner=$(printf '%s' "$GITHUB_REPOSITORY_OWNER" | tr '[:upper:]' '[:lower:]')
-          echo "name=ghcr.io/${image_owner}/webotp" >> "$GITHUB_OUTPUT"
+          set -euo pipefail
+          # A retry reuses the existing version image instead of overwriting it.
+          if docker buildx imagetools inspect "$IMAGE:$TAG"; then
+            echo 'image=true' >> "$GITHUB_OUTPUT"
+          else
+            # Do not rebuild an image belonging to an existing release.
+            if gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+              echo 'Release exists but its image cannot be read'; exit 1
+            fi
+            echo 'image=false' >> "$GITHUB_OUTPUT"
+          fi
 
-      # 🔹 Build unified multi-arch image
-      - name: Build and push image
+      - name: Build and push version image
+        if: steps.existing.outputs.image != 'true'
         uses: docker/build-push-action@v6
         with:
           context: .
           file: docker/Dockerfile
           platforms: linux/amd64,linux/arm64
           push: true
-          provenance: false
-          tags: |
-            ${{ steps.image.outputs.name }}:v${{ env.APP_VERSION }}
-            ${{ steps.image.outputs.name }}:latest
+          tags: ${{ env.IMAGE }}:${{ github.ref_name }}
+          labels: |
+            org.opencontainers.image.source=https://github.com/${{ github.repository }}
+            org.opencontainers.image.revision=${{ github.sha }}
+            org.opencontainers.image.version=${{ github.ref_name }}
+          cache-from: type=gha,scope=webotp-release
+          cache-to: type=gha,mode=max,scope=webotp-release
 
-      - name: Create GitHub Release
-        uses: actions/create-release@v1
+      - name: Create release and promote the newest version
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          tag_name: v${{ env.APP_VERSION }}
-          release_name: Release v${{ env.APP_VERSION }}
-          draft: false
-          prerelease: false
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+          # Read failures abort; they must not be mistaken for a missing release.
+          releases=$(gh api --paginate "repos/$GITHUB_REPOSITORY/releases?per_page=100" --jq '.[] | select(.draft == false and .prerelease == false) | .tag_name')
+          if ! grep -Fxq "$TAG" <<< "$releases"; then
+            gh release create "$TAG" --repo "$GITHUB_REPOSITORY" --verify-tag --title "Release $TAG" --generate-notes --latest=false
+          fi
+          newest=$(printf '%s\n%s\n' "$releases" "$TAG" | grep -E '^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$' | sort -V | tail -n 1)
+          if [[ "$TAG" == "$newest" ]]; then
+            docker buildx imagetools create --tag "$IMAGE:latest" "$IMAGE:$TAG"
+            gh release edit "$TAG" --repo "$GITHUB_REPOSITORY" --latest
+          fi

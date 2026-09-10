@@ -65,7 +65,7 @@ export class AuthService {
       );
 
       return tokens;
-    } catch (error) {
+    } catch {
       throw new UnauthorizedException(
         this.i18nService.translate("auth.invalid_token", language),
       );
@@ -79,7 +79,7 @@ export class AuthService {
       }) as TokenPayload;
 
       await this.authRepository.updateRefreshToken(payload.sub, null);
-    } catch (error) {
+    } catch {
       // Silent logout even if token is invalid
     }
   }

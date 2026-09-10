@@ -1,6 +1,6 @@
 import { Test, TestingModule } from "@nestjs/testing";
 import { JwtService } from "@nestjs/jwt";
-import { UnauthorizedException, ConflictException } from "@nestjs/common";
+import { UnauthorizedException } from "@nestjs/common";
 import * as bcrypt from "bcrypt";
 import { AuthService } from "../../src/auth/auth.service";
 import { AuthRepository } from "../../src/auth/auth.repository";

@@ -208,3 +208,35 @@ Contributions are welcome! Please follow these steps:
 ## 📄 License
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+
+## Release workflow
+
+CI runs on pull requests and pushes to `main`, and is reused before publishing a
+release. It installs the pinned pnpm version, generates Prisma Client, runs lint
+and tests, and builds both applications. Configure the repository's main branch
+rules to require the `validate` CI check before merging. Frontend lint currently
+allows the four existing React Hooks warnings; additional warnings fail CI.
+
+To release, update the root `package.json` version in a normal pull request.
+After merging, tag that exact commit and push the tag. For example, for a version
+of `1.0.5`:
+
+```bash
+git switch main
+git pull --ff-only origin main
+git tag -a v1.0.5 -m "Release v1.0.5"
+git push origin v1.0.5
+```
+
+Only stable `vMAJOR.MINOR.PATCH` tags matching the root package version and pointing
+to a commit on `main` can publish. The workflow builds native dependencies for
+both `linux/amd64` and `linux/arm64` using QEMU and Buildx, publishes the versioned
+GHCR image, then creates a GitHub Release for the existing tag. Only the highest
+published stable version is promoted to the image and GitHub Release `latest`.
+Release jobs are serialized and never push commits back to `main`.
+
+If publication fails, rerun the failed workflow jobs for the same tag. A version
+image already in GHCR is reused, and an existing Release is preserved. Never move
+a published tag; use a new version for changed code. GitHub concurrency retains
+at most one pending run, so push one release tag at a time and wait for completion;
+rerun a pending release if GitHub replaced it with a newer queued run.
