@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { Platform } from '@web-otp/shared/types';
+import { Platform } from '@webotp/shared/types';
 import { platformsService, CreatePlatformDto, UpdatePlatformDto } from '../services/api/platforms';
 import i18n from '../i18n';
 

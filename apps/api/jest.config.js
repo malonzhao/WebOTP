@@ -9,6 +9,6 @@ module.exports = {
   coverageDirectory: './coverage',
   testEnvironment: 'node',
   moduleNameMapper: {
-    '^@web-otp/shared/(.*)$': '<rootDir>/../../packages/shared/$1',
+    '^@webotp/shared/(.*)$': '<rootDir>/../../packages/shared/$1',
   },
 };

@@ -1,5 +1,5 @@
 import { apiClient } from './client';
-import { UserPlatformWithPlatform } from '@web-otp/shared/types';
+import { UserPlatformWithPlatform } from '@webotp/shared/types';
 
 export interface CreateUserPlatformDto {
   platformId: string;

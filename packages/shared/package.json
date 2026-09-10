@@ -1,15 +1,15 @@
 {
-  "name": "@web-otp/shared",
+  "name": "@webotp/shared",
   "version": "0.0.0",
   "private": true,
-  "description": "Shared types, utilities and constants for Web OTP",
+  "description": "Shared types, utilities and constants for WebOTP",
   "main": "index.ts",
   "types": "index.ts",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [
-    "web-otp",
+    "webotp",
     "shared"
   ],
   "author": "",

@@ -1,9 +1,9 @@
 {
-  "name": "@web-otp/web",
+  "name": "@webotp/web",
   "version": "0.0.0",
   "private": true,
   "type": "module",
-  "description": "Frontend for Web OTP",
+  "description": "Frontend for WebOTP",
   "license": "MIT",
   "author": "Malon",
   "scripts": {

@@ -5,7 +5,7 @@ import { ArrowPathIcon, TrashIcon, DocumentDuplicateIcon, PlusIcon, PencilIcon }
 import { useAuthStore } from '../stores/auth.store';
 import { useUserPlatformsStore } from '../stores/user-platforms.store';
 import { usePlatformsStore } from '../stores/platforms.store';
-import { Platform } from '@web-otp/shared/types';
+import { Platform } from '@webotp/shared/types';
 import { format } from 'date-fns';
 import { enUS, zhCN, zhTW } from 'date-fns/locale';
 import LanguageSwitcher from '../components/common/LanguageSwitcher';

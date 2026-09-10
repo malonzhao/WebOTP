@@ -7,11 +7,11 @@ WORKDIR /repo
 COPY . .
 
 # Install dependencies and build both projects
-RUN npm install -g pnpm
+RUN npm install -g "$(node -p "require('./package.json').packageManager")"
 RUN pnpm install --frozen-lockfile
-RUN pnpm -F @web-otp/api prisma:generate
+RUN pnpm -F @webotp/api prisma:generate
 RUN pnpm build
-RUN pnpm deploy --filter @web-otp/api --prod --legacy dist
+RUN pnpm deploy --filter @webotp/api --prod --legacy dist
 
 # Final image with nginx and supervisor
 FROM --platform=$BUILDPLATFORM node:22-alpine

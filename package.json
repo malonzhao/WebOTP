@@ -1,5 +1,5 @@
 {
-  "name": "web-otp",
+  "name": "webotp",
   "version": "1.0.4",
   "description": "A web application for one-time password.",
   "scripts": {

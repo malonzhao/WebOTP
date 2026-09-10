@@ -24,7 +24,7 @@
     /* Path Mapping */
     "baseUrl": ".",
     "paths": {
-      "@web-otp/shared/*": ["../../packages/shared/*"]
+      "@webotp/shared/*": ["../../packages/shared/*"]
     }
   },
   "include": ["src"],

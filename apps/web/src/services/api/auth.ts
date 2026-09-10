@@ -1,5 +1,5 @@
 import { apiClient } from './client';
-import { AuthTokens } from '@web-otp/shared/types';
+import { AuthTokens } from '@webotp/shared/types';
 import { LoginDto } from './dto/auth.dto';
 
 export interface UpdatePasswordDto {

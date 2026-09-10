@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { UserPlatformWithPlatform } from '@web-otp/shared/types';
+import { UserPlatformWithPlatform } from '@webotp/shared/types';
 import { userPlatformsService, CreateUserPlatformDto, OTPResponse } from '../services/api/user-platforms';
 import i18n from '../i18n';
 

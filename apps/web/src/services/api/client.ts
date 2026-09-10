@@ -1,5 +1,5 @@
 import axios, { AxiosInstance, AxiosRequestConfig, AxiosResponse } from 'axios';
-import { AuthTokens } from '@web-otp/shared/types';
+import { AuthTokens } from '@webotp/shared/types';
 
 class ApiClient {
   private client: AxiosInstance;

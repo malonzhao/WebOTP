@@ -1,8 +1,8 @@
 {
-  "name": "@web-otp/api",
+  "name": "@webotp/api",
   "version": "0.0.0",
   "private": true,
-  "description": "Backend API for Web OTP",
+  "description": "Backend API for WebOTP",
   "author": "Malon",
   "main": "dist/main.js",
   "license": "MIT",
