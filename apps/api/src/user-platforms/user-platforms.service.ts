@@ -21,7 +21,7 @@ export class UserPlatformsService {
     userId: string,
     page: number = 1,
     limit: number = 20,
-  ): Promise<{ data: UserPlatformWithPlatform[]; total: number }> {
+  ): Promise<{ data: UserPlatformWithPlatform[]; total: number; hasMore: boolean }> {
     return this.userPlatformsRepository.findAllByUserId(userId, page, limit);
   }
 

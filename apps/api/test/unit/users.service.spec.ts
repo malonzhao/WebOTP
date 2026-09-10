@@ -3,7 +3,8 @@ import { NotFoundException, ConflictException } from "@nestjs/common";
 import * as bcrypt from "bcrypt";
 import { UsersService } from "../../src/users/users.service";
 import { UsersRepository } from "../../src/users/users.repository";
-import { User } from "generated/prisma";
+import { User } from "../../generated/prisma";
+import { I18nService } from "../../src/i18n/i18n.service";
 
 // Mock the bcrypt module
 jest.mock("bcrypt");
@@ -40,6 +41,7 @@ describe("UsersService", () => {
       providers: [
         UsersService,
         { provide: UsersRepository, useValue: mockUsersRepository },
+        { provide: I18nService, useValue: { translate: (key: string) => key } },
       ],
     }).compile();
 
@@ -69,34 +71,27 @@ describe("UsersService", () => {
     });
   });
 
-  describe("update", () => {
+  describe("updateUsername", () => {
     const updateData = {
       username: "newuser",
-      password: "newpassword",
     };
 
     it("should update user successfully", async () => {
-      mockUsersRepository.findById.mockResolvedValue(mockUser);
       mockUsersRepository.findByUsername.mockResolvedValue(null);
-      (bcrypt.hash as jest.Mock).mockResolvedValue("newHashedPassword");
       const updatedUser = {
         ...mockUser,
         ...updateData,
-        password: "newHashedPassword",
       };
       mockUsersRepository.update.mockResolvedValue(updatedUser);
 
-      const originalPassword = updateData.password;
-      const result = await usersService.update("1", updateData);
+      const result = await usersService.updateUsername("1", updateData.username);
 
-      expect(usersRepository.findById).toHaveBeenCalledWith("1");
       expect(usersRepository.findByUsername).toHaveBeenCalledWith(
         updateData.username,
       );
-      expect(bcrypt.hash).toHaveBeenCalledWith(originalPassword, 10);
+      expect(bcrypt.hash).not.toHaveBeenCalled();
       expect(usersRepository.update).toHaveBeenCalledWith("1", {
         ...updateData,
-        password: "newHashedPassword",
       });
       expect(result).toEqual(updatedUser);
     });
@@ -110,7 +105,7 @@ describe("UsersService", () => {
       });
 
       await expect(
-        usersService.update("1", { username: "existinguser" }),
+        usersService.updateUsername("1", "existinguser"),
       ).rejects.toThrow(ConflictException);
     });
   });

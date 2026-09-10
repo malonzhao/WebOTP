@@ -13,10 +13,11 @@ export class UserPlatformsRepository {
     if (!encryptionKey) {
       throw new Error("ENCRYPTION_KEY environment variable is required");
     }
-    if (encryptionKey.length < 32) {
-      throw new Error("ENCRYPTION_KEY must be at least 32 characters long");
+    const key = Buffer.from(encryptionKey, "utf8");
+    if (key.length !== 32) {
+      throw new Error("ENCRYPTION_KEY must be exactly 32 bytes long");
     }
-    return Buffer.from(encryptionKey, "utf8");
+    return key;
   })();
 
   private encryptSecret(secret: string): string {
@@ -43,7 +44,7 @@ export class UserPlatformsRepository {
     userId: string,
     page: number = 1,
     limit: number = 20,
-  ): Promise<{ data: UserPlatformWithPlatform[]; total: number }> {
+  ): Promise<{ data: UserPlatformWithPlatform[]; total: number; hasMore: boolean }> {
     const skip = (page - 1) * limit;
 
     const [data, total] = await Promise.all([
@@ -59,7 +60,7 @@ export class UserPlatformsRepository {
       }),
     ]);
 
-    return { data, total };
+    return { data, total, hasMore: skip + data.length < total };
   }
 
   async findById(id: string): Promise<UserPlatformWithPlatform | null> {

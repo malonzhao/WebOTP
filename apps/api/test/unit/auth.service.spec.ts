@@ -6,6 +6,7 @@ import { AuthService } from "../../src/auth/auth.service";
 import { AuthRepository } from "../../src/auth/auth.repository";
 import { LoginDto } from "../../src/auth/dto/login.dto";
 import { TokensDto } from "../../src/auth/dto/tokens.dto";
+import { I18nService } from "../../src/i18n/i18n.service";
 
 // Mock the bcrypt module
 jest.mock("bcrypt");
@@ -35,6 +36,7 @@ describe("AuthService", () => {
         AuthService,
         { provide: AuthRepository, useValue: mockAuthRepository },
         { provide: JwtService, useValue: mockJwtService },
+        { provide: I18nService, useValue: { translate: (key: string) => key } },
       ],
     }).compile();
 
@@ -56,6 +58,7 @@ describe("AuthService", () => {
       id: "1",
       password: "hashedPassword",
       username: "testuser",
+      isActive: true,
     };
 
     const mockTokens: TokensDto = {
@@ -88,6 +91,15 @@ describe("AuthService", () => {
         "refreshToken",
       );
       expect(result).toEqual(mockTokens);
+    });
+
+    it("should reject disabled users before checking credentials or issuing tokens", async () => {
+      mockAuthRepository.findUserByUsername.mockResolvedValue({ ...mockUser, isActive: false });
+
+      await expect(authService.login(loginDto)).rejects.toThrow(UnauthorizedException);
+      expect(bcrypt.compare).not.toHaveBeenCalled();
+      expect(mockJwtService.sign).not.toHaveBeenCalled();
+      expect(mockAuthRepository.updateRefreshToken).not.toHaveBeenCalled();
     });
 
     it("should throw UnauthorizedException if user not found", async () => {
@@ -130,6 +142,7 @@ describe("AuthService", () => {
       id: "1",
       username: "testuser",
       refreshToken: "validRefreshToken",
+      isActive: true,
     };
 
     const mockTokens: TokensDto = {
@@ -159,6 +172,15 @@ describe("AuthService", () => {
         "newRefreshToken",
       );
       expect(result).toEqual(mockTokens);
+    });
+
+    it("should reject disabled users without issuing or storing new tokens", async () => {
+      mockJwtService.verify.mockReturnValue(payload);
+      mockAuthRepository.findUserById.mockResolvedValue({ ...mockUser, isActive: false });
+
+      await expect(authService.refreshToken(refreshToken)).rejects.toThrow(UnauthorizedException);
+      expect(mockJwtService.sign).not.toHaveBeenCalled();
+      expect(mockAuthRepository.updateRefreshToken).not.toHaveBeenCalled();
     });
 
     it("should throw UnauthorizedException if refresh token is invalid", async () => {

@@ -12,9 +12,7 @@ interface UserPlatformsState {
   error: string | null;
   otpData: Map<string, OTPResponse>;
   hasMore: boolean;
-  nextCursor: string | null;
-
-  // Actions
+  nextPage: number | null;
   loadUserPlatforms: (page?: number, limit?: number) => Promise<void>;
   loadMoreUserPlatforms: (limit?: number) => Promise<void>;
   createUserPlatform: (data: CreateUserPlatformDto) => Promise<UserPlatformWithPlatform>;
@@ -26,7 +24,6 @@ interface UserPlatformsState {
 }
 
 export const useUserPlatformsStore = create<UserPlatformsState>((set, get) => {
-  // Use Set to track ongoing OTP generation platforms to avoid duplicate requests
   const ongoingOTPGenerations = new Set<string>();
 
   return {
@@ -38,87 +35,82 @@ export const useUserPlatformsStore = create<UserPlatformsState>((set, get) => {
     error: null,
     otpData: new Map(),
     hasMore: true,
-    nextCursor: null,
+    nextPage: null,
 
-    loadUserPlatforms: async (page: number = 1, limit: number = 20) => {
+    loadUserPlatforms: async (page = 1, limit = 20) => {
       set({ isLoading: true, error: null });
       try {
-        const { data, total, nextCursor } = await userPlatformsService.findAll(page, limit);
+        const { data, total, hasMore } = await userPlatformsService.findAll(page, limit);
         set({
           userPlatforms: data,
           total,
           currentPage: page,
           isLoading: false,
-          hasMore: !!nextCursor, // Use cursor to determine if there is more data
-          nextCursor,
+          hasMore,
+          nextPage: hasMore ? page + 1 : null,
         });
       } catch (error: any) {
         set({
           error: error.response?.data?.message || i18n.t('errors.loadUserPlatformsFailed'),
-          isLoading: false
+          isLoading: false,
         });
       }
     },
 
-    loadMoreUserPlatforms: async (limit: number = 20) => {
+    loadMoreUserPlatforms: async (limit = 20) => {
       const state = get();
-      if (state.isLoadingMore || !state.hasMore || !state.nextCursor) return;
+      if (state.isLoadingMore || !state.hasMore || state.nextPage === null) return;
 
+      const page = state.nextPage;
       set({ isLoadingMore: true, error: null });
       try {
-        const { data, total, nextCursor } = await userPlatformsService.findAll(1, limit, state.nextCursor);
-        set(state => ({
-          userPlatforms: [...state.userPlatforms, ...data],
+        const { data, total, hasMore } = await userPlatformsService.findAll(page, limit);
+        set(currentState => ({
+          userPlatforms: [...currentState.userPlatforms, ...data],
           total,
+          currentPage: page,
           isLoadingMore: false,
-          hasMore: !!nextCursor, // Use cursor to determine if there is more data
-          nextCursor,
+          hasMore,
+          nextPage: hasMore ? page + 1 : null,
         }));
       } catch (error: any) {
         set({
           error: error.response?.data?.message || i18n.t('errors.loadMoreFailed'),
-          isLoadingMore: false
+          isLoadingMore: false,
         });
       }
     },
 
-
-    createUserPlatform: async (data: CreateUserPlatformDto) => {
+    createUserPlatform: async (data) => {
       set({ isLoading: true, error: null });
       try {
         const newUserPlatform = await userPlatformsService.create(data);
-        // Reload the list to get updated data with pagination
-        const currentState = get();
-        await get().loadUserPlatforms(currentState.currentPage);
+        await get().loadUserPlatforms();
         return newUserPlatform;
       } catch (error: any) {
         set({
           error: error.response?.data?.message || i18n.t('errors.createUserPlatformFailed'),
-          isLoading: false
+          isLoading: false,
         });
         throw error;
       }
     },
 
-
-    deleteUserPlatform: async (id: string) => {
+    deleteUserPlatform: async (id) => {
       set({ isLoading: true, error: null });
       try {
         await userPlatformsService.delete(id);
-        // Reload the list to get updated data with pagination
-        const currentState = get();
-        await get().loadUserPlatforms(currentState.currentPage);
+        await get().loadUserPlatforms();
       } catch (error: any) {
         set({
           error: error.response?.data?.message || i18n.t('errors.deleteUserPlatformFailed'),
-          isLoading: false
+          isLoading: false,
         });
         throw error;
       }
     },
 
-    generateOTP: async (id: string): Promise<OTPResponse> => {
-      // Check if already generating to avoid duplicate requests
+    generateOTP: async (id) => {
       if (ongoingOTPGenerations.has(id)) {
         throw new Error('OTP generation already in progress for this platform');
       }
@@ -126,9 +118,7 @@ export const useUserPlatformsStore = create<UserPlatformsState>((set, get) => {
       set({ error: null });
       try {
         const otpResponse = await userPlatformsService.generateOTP(id);
-        set(state => ({
-          otpData: new Map(state.otpData).set(id, otpResponse),
-        }));
+        set(state => ({ otpData: new Map(state.otpData).set(id, otpResponse) }));
         return otpResponse;
       } catch (error: any) {
         set({
@@ -141,17 +131,17 @@ export const useUserPlatformsStore = create<UserPlatformsState>((set, get) => {
     },
 
     clearError: () => set({ error: null }),
-    clearOTPData: (id: string) => set(state => {
-      const newOtpData = new Map(state.otpData);
-      newOtpData.delete(id);
-      return { otpData: newOtpData };
+    clearOTPData: (id) => set(state => {
+      const otpData = new Map(state.otpData);
+      otpData.delete(id);
+      return { otpData };
     }),
     resetUserPlatforms: () => set({
       userPlatforms: [],
       total: 0,
       currentPage: 1,
       hasMore: true,
-      nextCursor: null
+      nextPage: null,
     }),
   };
 });

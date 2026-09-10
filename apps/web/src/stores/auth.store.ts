@@ -151,40 +151,41 @@ export const useAuthStore: any = create(
     }
   )
 );
-let authInitialized = false;
+let authInitialization: Promise<void> | null = null;
 // Initialize auth state from localStorage
-export const initializeAuthState = async () => {
+export const initializeAuthState = (): Promise<void> => {
   // Prevent execution when window is undefined (server-side check)
   if (typeof window === 'undefined') {
-    return;
+    return Promise.resolve();
   }
 
-  // Check global flag to prevent duplicate API calls
-  if (authInitialized) {
-    return;
+  // Every caller waits for the same startup validation, including StrictMode.
+  if (authInitialization) {
+    return authInitialization;
   }
 
-  try {
-    authInitialized = true;
-    const tokens = AuthService.getTokens();
-
-    if (tokens) {
+  authInitialization = Promise.resolve().then(async () => {
+    try {
+      if (!AuthService.getTokens()) {
+        useAuthStore.getState().handleTokenExpired();
+        return;
+      }
       const user = await authService.getCurrentUser();
+      // The profile request may have refreshed or cleared the tokens.
+      const tokens = AuthService.getTokens();
+      if (!tokens) {
+        useAuthStore.getState().handleTokenExpired();
+        return;
+      }
       useAuthStore.setState({
         tokens,
         user,
         isAuthenticated: true
       });
-    } else {
-      console.error('No tokens found');
+    } catch (e) {
+      console.error('Auth initialization failed:', e);
+      useAuthStore.getState().handleTokenExpired();
     }
-  } catch (e) {
-    console.error('Auth initialization failed:', e);
-    AuthService.clearTokens();
-    useAuthStore.setState({
-      tokens: null,
-      user: null,
-      isAuthenticated: false
-    });
-  }
+  });
+  return authInitialization;
 };

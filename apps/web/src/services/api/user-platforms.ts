@@ -13,12 +13,8 @@ export interface OTPResponse {
 }
 
 export class UserPlatformsService {
-  async findAll(page: number = 1, limit: number = 20, cursor?: string): Promise<{ data: UserPlatformWithPlatform[]; total: number; nextCursor?: string }> {
-    let url = `/user-platforms?page=${page}&limit=${limit}`;
-    if (cursor) {
-      url += `&cursor=${cursor}`;
-    }
-    return apiClient.get(url);
+  async findAll(page: number = 1, limit: number = 20): Promise<{ data: UserPlatformWithPlatform[]; total: number; hasMore: boolean }> {
+    return apiClient.get(`/user-platforms?page=${page}&limit=${limit}`);
   }
 
   async create(createUserPlatformDto: CreateUserPlatformDto): Promise<UserPlatformWithPlatform> {

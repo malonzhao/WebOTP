@@ -20,7 +20,7 @@ export class AuthService {
 
   async login(loginDto: LoginDto, language?: string): Promise<TokensDto> {
     const user = await this.authRepository.findUserByUsername(loginDto.username);
-    if (!user) {
+    if (!user || !user.isActive) {
       throw new UnauthorizedException(
         this.i18nService.translate("auth.invalid_credentials", language),
       );
@@ -52,7 +52,7 @@ export class AuthService {
       }) as TokenPayload;
 
       const user = await this.authRepository.findUserById(payload.sub);
-      if (!user || user.refreshToken !== refreshToken) {
+      if (!user || !user.isActive || user.refreshToken !== refreshToken) {
         throw new UnauthorizedException(
           this.i18nService.translate("auth.invalid_token", language),
         );

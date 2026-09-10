@@ -4,6 +4,7 @@ import { AuthTokens } from '@webotp/shared/types';
 class ApiClient {
   private client: AxiosInstance;
   private baseURL: string;
+  private refreshRequest: Promise<AuthTokens> | null = null;
 
   constructor() {
     this.baseURL = import.meta.env.VITE_API_BASE_URL || '/api';
@@ -16,6 +17,33 @@ class ApiClient {
     });
 
     this.setupInterceptors();
+  }
+
+  private expireAuthentication(): void {
+    localStorage.removeItem('accessToken');
+    localStorage.removeItem('refreshToken');
+    window.dispatchEvent(new CustomEvent('auth-token-expired'));
+  }
+
+  private refreshTokens(): Promise<AuthTokens> {
+    if (!this.refreshRequest) {
+      this.refreshRequest = (async () => {
+        const refreshToken = localStorage.getItem('refreshToken');
+        if (!refreshToken) throw new Error('No refresh token available');
+
+        const { data } = await this.client.post<AuthTokens>('/auth/refresh', { refreshToken });
+        localStorage.setItem('accessToken', data.accessToken);
+        localStorage.setItem('refreshToken', data.refreshToken);
+        window.dispatchEvent(new CustomEvent('auth-tokens-refreshed', { detail: data }));
+        return data;
+      })().catch(error => {
+        this.expireAuthentication();
+        throw error;
+      }).finally(() => {
+        this.refreshRequest = null;
+      });
+    }
+    return this.refreshRequest;
   }
 
   private setupInterceptors(): void {
@@ -38,38 +66,21 @@ class ApiClient {
         const originalRequest = error.config;
 
         // Skip token refresh for authentication endpoints
-        if (error.response?.status === 401 &&
-            !originalRequest._retry &&
+        if (error.response?.status === 401 && originalRequest &&
             !originalRequest.url?.includes('/auth')) {
+          if (originalRequest._retry) {
+            this.expireAuthentication();
+            return Promise.reject(error);
+          }
           originalRequest._retry = true;
 
-          try {
-            const refreshToken = localStorage.getItem('refreshToken');
-            if (!refreshToken) {
-              throw new Error('No refresh token available');
-            }
-
-            const response = await this.client.post<AuthTokens>(
-              '/auth/refresh',
-              { refreshToken }
-            );
-
-            const { accessToken, refreshToken: newRefreshToken } = response.data;
-            localStorage.setItem('accessToken', accessToken);
-            localStorage.setItem('refreshToken', newRefreshToken);
-
-            originalRequest.headers.Authorization = `Bearer ${accessToken}`;
-            return this.client(originalRequest);
-          } catch (refreshError) {
-            // Clear tokens on refresh failure - let React handle authentication state
-            localStorage.removeItem('accessToken');
-            localStorage.removeItem('refreshToken');
-
-            // Trigger global auth token expired event
-            window.dispatchEvent(new CustomEvent('auth-token-expired'));
-
-            return Promise.reject(refreshError);
+          // A different request may already have refreshed this access token.
+          let accessToken = localStorage.getItem('accessToken');
+          if (!accessToken || originalRequest.headers.Authorization === `Bearer ${accessToken}`) {
+            ({ accessToken } = await this.refreshTokens());
           }
+          originalRequest.headers.Authorization = `Bearer ${accessToken}`;
+          return this.client(originalRequest);
         }
 
         return Promise.reject(error);
