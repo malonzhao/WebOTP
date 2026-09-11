@@ -1,9 +1,21 @@
 # WebOTP
 
+English | [简体中文](README.zh-CN.md)
+
 A web application for managing OTP (One-Time Password). The system consists of a NestJS backend API and a React frontend interface with internationalization support.
 
-The product name is **WebOTP**. Package names, import paths, container names and image repositories use the lowercase identifier `webotp`.
+<p align="center">
+  <a href="https://github.com/malonzhao/WebOTP/stargazers"><img src="https://img.shields.io/github/stars/malonzhao/WebOTP" alt="GitHub stars"></a>
+  <a href="https://github.com/malonzhao/WebOTP/forks"><img src="https://img.shields.io/github/forks/malonzhao/WebOTP" alt="GitHub forks"></a>
+  <a href="https://github.com/malonzhao/WebOTP/issues"><img src="https://img.shields.io/github/issues/malonzhao/WebOTP" alt="GitHub open issues"></a>
+</p>
+
 ![screenshot](assets/screenshot.png)
+
+The product name is **WebOTP**. Package names, import paths, container names and image repositories use the lowercase identifier `webotp`.
+
+Badges refresh through Shields.io and may be cached; follow the links for repository details.
+
 ## 🌟 Features
 
 - **User Authentication**
@@ -197,6 +209,8 @@ pnpm --filter @webotp/web test
 ```
 
 ## 🤝 Contributing
+
+When updating this README, update both the English and Simplified Chinese editions together.
 
 Contributions are welcome! Please follow these steps:
 1. Fork the repository
