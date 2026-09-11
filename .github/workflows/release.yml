@@ -1,28 +1,37 @@
 name: Release
+run-name: Release ${{ inputs.tag || github.ref_name }}
 
 on:
   push:
     tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Existing version tag to publish using the workflow on main
+        required: true
+        type: string
 
 permissions:
   contents: read
 
-# Never interrupt a publication after it has started writing artifacts.
+# Serialize publication, including manual retries of older tags.
 concurrency:
   group: webotp-release
   cancel-in-progress: false
 
 jobs:
-  validate:
-    uses: ./.github/workflows/ci.yml
-
-  release:
-    needs: validate
-    runs-on: ubuntu-latest
-    timeout-minutes: 60
+  prepare:
+    if: github.event_name != 'workflow_dispatch' || github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
     permissions:
-      contents: write
+      contents: read
       packages: write
+    outputs:
+      image: ${{ steps.image.outputs.name }}
+      tag: ${{ steps.image.outputs.tag }}
+      sha: ${{ steps.image.outputs.sha }}
+      existing: ${{ steps.existing.outputs.image }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -30,17 +39,23 @@ jobs:
           persist-credentials: false
 
       - name: Validate release tag
+        id: image
         env:
-          TAG: ${{ github.ref_name }}
+          TAG: ${{ inputs.tag || github.ref_name }}
         run: |
           set -euo pipefail
-          version=$(node -p "require('./package.json').version")
           [[ "$TAG" =~ ^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$ ]] || { echo 'Expected a stable vMAJOR.MINOR.PATCH tag'; exit 1; }
+          sha=$(git rev-parse --verify "refs/tags/$TAG^{commit}")
+          git checkout --detach "$sha"
+          version=$(node -p "require('./package.json').version")
           [[ "$TAG" == "v$version" ]] || { echo 'Tag does not match package.json'; exit 1; }
           git merge-base --is-ancestor HEAD origin/main || { echo 'Release commit must belong to main'; exit 1; }
-          echo "IMAGE=ghcr.io/${GITHUB_REPOSITORY_OWNER,,}/webotp" >> "$GITHUB_ENV"
+          image_owner=$(printf '%s' "$GITHUB_REPOSITORY_OWNER" | tr '[:upper:]' '[:lower:]')
+          echo "IMAGE=ghcr.io/${image_owner}/webotp" >> "$GITHUB_ENV"
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+          echo "sha=$sha" >> "$GITHUB_OUTPUT"
+          echo "name=ghcr.io/${image_owner}/webotp" >> "$GITHUB_OUTPUT"
 
-      - uses: docker/setup-qemu-action@v3
       - uses: docker/setup-buildx-action@v3
       - uses: docker/login-action@v3
         with:
@@ -51,50 +66,51 @@ jobs:
       - name: Check for an already published version
         id: existing
         env:
-          TAG: ${{ github.ref_name }}
+          TAG: ${{ inputs.tag || github.ref_name }}
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
           # A retry reuses the existing version image instead of overwriting it.
-          if docker buildx imagetools inspect "$IMAGE:$TAG"; then
+          if docker buildx imagetools inspect "$IMAGE:$TAG" 2> "$RUNNER_TEMP/image-inspect-error"; then
             echo 'image=true' >> "$GITHUB_OUTPUT"
           else
+            cat "$RUNNER_TEMP/image-inspect-error" >&2
+            # Network/auth failures must not be treated as a missing image.
+            grep -Eqi 'manifest unknown|not found' "$RUNNER_TEMP/image-inspect-error" || exit 1
+            releases=$(gh api --paginate "repos/$GITHUB_REPOSITORY/releases?per_page=100" --jq '.[].tag_name')
             # Do not rebuild an image belonging to an existing release.
-            if gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            if grep -Fxq "$TAG" <<< "$releases"; then
               echo 'Release exists but its image cannot be read'; exit 1
             fi
             echo 'image=false' >> "$GITHUB_OUTPUT"
           fi
 
-      - name: Build and push version image
-        if: steps.existing.outputs.image != 'true'
-        uses: docker/build-push-action@v6
-        with:
-          context: .
-          file: docker/Dockerfile
-          platforms: linux/amd64,linux/arm64
-          push: true
-          tags: ${{ env.IMAGE }}:${{ github.ref_name }}
-          labels: |
-            org.opencontainers.image.source=https://github.com/${{ github.repository }}
-            org.opencontainers.image.revision=${{ github.sha }}
-            org.opencontainers.image.version=${{ github.ref_name }}
-          cache-from: type=gha,scope=webotp-release
-          cache-to: type=gha,mode=max,scope=webotp-release
+  validate:
+    needs: prepare
+    uses: ./.github/workflows/ci.yml
+    with:
+      ref: ${{ needs.prepare.outputs.sha }}
 
-      - name: Create release and promote the newest version
-        env:
-          GH_TOKEN: ${{ github.token }}
-          TAG: ${{ github.ref_name }}
-        run: |
-          set -euo pipefail
-          # Read failures abort; they must not be mistaken for a missing release.
-          releases=$(gh api --paginate "repos/$GITHUB_REPOSITORY/releases?per_page=100" --jq '.[] | select(.draft == false and .prerelease == false) | .tag_name')
-          if ! grep -Fxq "$TAG" <<< "$releases"; then
-            gh release create "$TAG" --repo "$GITHUB_REPOSITORY" --verify-tag --title "Release $TAG" --generate-notes --latest=false
-          fi
-          newest=$(printf '%s\n%s\n' "$releases" "$TAG" | grep -E '^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$' | sort -V | tail -n 1)
-          if [[ "$TAG" == "$newest" ]]; then
-            docker buildx imagetools create --tag "$IMAGE:latest" "$IMAGE:$TAG"
-            gh release edit "$TAG" --repo "$GITHUB_REPOSITORY" --latest
-          fi
+  build:
+    needs: [prepare, validate]
+    if: needs.prepare.outputs.existing != 'true'
+    uses: ./.github/workflows/build-images.yml
+    permissions:
+      contents: read
+      packages: write
+    with:
+      sha: ${{ needs.prepare.outputs.sha }}
+      tag: ${{ needs.prepare.outputs.tag }}
+      image: ${{ needs.prepare.outputs.image }}
+
+  publish:
+    needs: [prepare, validate, build]
+    if: ${{ always() && !cancelled() && needs.prepare.result == 'success' && needs.validate.result == 'success' && (needs.build.result == 'success' || needs.prepare.outputs.existing == 'true') }}
+    uses: ./.github/workflows/publish-release.yml
+    permissions:
+      contents: write
+      packages: write
+    with:
+      tag: ${{ needs.prepare.outputs.tag }}
+      image: ${{ needs.prepare.outputs.image }}
+      existing: ${{ needs.prepare.outputs.existing == 'true' }}

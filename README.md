@@ -211,9 +211,9 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ## Release workflow
 
-CI runs on pull requests and pushes to `main`, and is reused before publishing a
-release. It installs the pinned pnpm version, generates Prisma Client, runs lint
-and tests, and builds both applications. Configure the repository's main branch
+CI runs on pull requests and pushes to `main`, selecting checks by branch intent
+and changed files. Release validation always installs the pinned pnpm version,
+generates Prisma Client, runs lint and tests, and builds both applications. Configure the repository's main branch
 rules to require the `validate` CI check before merging. Frontend lint currently
 allows the four existing React Hooks warnings; additional warnings fail CI.
 
@@ -230,8 +230,11 @@ git push origin v1.0.5
 
 Only stable `vMAJOR.MINOR.PATCH` tags matching the root package version and pointing
 to a commit on `main` can publish. The workflow builds native dependencies for
-both `linux/amd64` and `linux/arm64` using QEMU and Buildx, publishes the versioned
-GHCR image, then creates a GitHub Release for the existing tag. Only the highest
+both `linux/amd64` and `linux/arm64` on native `ubuntu-24.04` and
+`ubuntu-24.04-arm` runners using Buildx. Each runner pushes its image by digest;
+after both succeed, the release job merges their manifests into the versioned
+GHCR image and verifies both platforms before creating a GitHub Release.
+QEMU is not used, and each architecture has its own build cache. Only the highest
 published stable version is promoted to the image and GitHub Release `latest`.
 Release jobs are serialized and never push commits back to `main`.
 
@@ -240,3 +243,63 @@ image already in GHCR is reused, and an existing Release is preserved. Never mov
 a published tag; use a new version for changed code. GitHub concurrency retains
 at most one pending run, so push one release tag at a time and wait for completion;
 rerun a pending release if GitHub replaced it with a newer queued run.
+
+Workflow maintenance does not require a new application version or tag. After
+merging workflow fixes into `main`, use the manual Release entry point to publish
+an existing tag with the current workflow:
+
+```bash
+gh workflow run release.yml --ref main -f tag=v1.0.4
+```
+
+In the Actions UI, select Release → Run workflow, choose `main`, and enter the
+existing tag. Manual runs from other branches are skipped. The workflow resolves
+the tag once to a commit SHA; validation and both image builds check out that
+same SHA. Image revision labels use the source SHA, not the workflow commit.
+The Dockerfile and dependency versions also come from the source tag.
+Rerunning an old run still uses its old workflow, so start a new manual run after
+workflow fixes. Existing version images are reused rather than overwritten.
+
+Workflow responsibilities:
+
+- `ci.yml`: change classification, selected checks, and the stable `validate`
+  gate; an explicitly supplied release SHA always receives full validation.
+- `release.yml`: automatic tag/manual entry, version and ancestry checks, source
+  SHA resolution, existing-image detection, and publication concurrency.
+- `build-images.yml`: reusable native AMD64/ARM64 builds with per-platform caches
+  and digest artifacts; no public version tag is created by an individual build.
+- `publish-release.yml`: reusable manifest merge, platform verification, GitHub
+  Release creation, and latest-version promotion.
+
+The two reusable publication workflows have no independent push/manual trigger.
+A failed validation or architecture build prevents publication; a retry with an
+existing image skips rebuilding but still validates source and image platforms.
+
+### Branch intent and CI selection
+
+| PR branch prefix | Intended change | Checks |
+| --- | --- | --- |
+| `docs/` | Documentation | Documentation checks when only documentation changes |
+| `ci/` | Workflows | Workflow checks when workflow files change |
+| `feat/`, `fix/`, `refactor/` | Application code | Full application validation |
+| `build/`, `deps/` | Build or dependencies | Full validation and an AMD64 image build without publishing |
+| `chore/` | Other maintenance | Selected from changed files |
+| Any other prefix | Unclassified | Full application validation plus applicable file checks |
+
+Actual files take precedence: application code and unknown file types require full
+validation even on a `docs/` branch. Docker files, package manifests, pnpm lockfile,
+workspace configuration, and npm configuration also require an image build.
+Markdown and documentation assets select documentation checks; scripts placed in
+`docs/` still require full validation. `.github/` changes run classifier tests and
+actionlint. Documentation checks currently detect unresolved conflict markers;
+they do not check prose quality or external links.
+
+PRs compare the merge base against the PR head. Pushes to `main` compare the
+before/after commits and use file changes, since the original branch prefix is no
+longer available. If the comparison cannot be determined, all checks run.
+The `validate` job always summarizes selected checks and fails on any failure or
+cancellation, while permitting intentional skips. Keep it as the required branch
+check instead of requiring conditional jobs individually.
+
+Branch prefixes never trigger a release. Only version tags or the manual Release
+entry publish images; CI image checks do not log in to GHCR or push images.

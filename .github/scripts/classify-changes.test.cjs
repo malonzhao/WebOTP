@@ -1,0 +1,14 @@
+const {test} = require('node:test');
+const assert = require('node:assert/strict');
+const {classify} = require('./classify-changes.cjs');
+test('docs branch cannot hide runtime changes',()=>assert.equal(classify(['apps/web/src/main.tsx'],'docs/update').full,true));
+test('known docs branch only checks documentation',()=>assert.deepEqual(classify(['README.md'],'docs/update'),{full:false,docs:true,workflows:false,image:false}));
+test('unknown prefixes default to full validation',()=>assert.equal(classify(['README.md'],'misc/update').full,true));
+test('main uses file changes after merge',()=>assert.equal(classify(['README.md'],'main').full,false));
+test('workflow-only change checks workflow',()=>assert.deepEqual(classify(['.github/workflows/ci.yml'],'ci/fix'),{full:false,docs:false,workflows:true,image:false}));
+test('dependency changes require image build even on docs branch',()=>assert.equal(classify(['pnpm-lock.yaml'],'docs/fix').image,true));
+test('build prefix requests image check',()=>assert.equal(classify(['README.md'],'build/update').image,true));
+test('feature prefix requests full validation',()=>assert.equal(classify(['README.md'],'feat/update').full,true));
+test('releases always validate source and image',()=>assert.equal(classify([],'main',true).image,true));
+test('unknown files fail closed',()=>assert.equal(classify(['custom-config'],'chore/update').full,true));
+test('scripts inside docs still require full validation',()=>assert.equal(classify(['docs/build.js'],'docs/update').full,true));

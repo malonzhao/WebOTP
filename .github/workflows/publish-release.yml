@@ -1,0 +1,79 @@
+name: Publish release
+
+on:
+  workflow_call:
+    inputs:
+      existing:
+        required: true
+        type: boolean
+      tag:
+        required: true
+        type: string
+      image:
+        required: true
+        type: string
+
+permissions:
+  contents: write
+  packages: write
+
+jobs:
+  release:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: write
+      packages: write
+    env:
+      IMAGE: ${{ inputs.image }}
+    steps:
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - uses: actions/download-artifact@v4
+        if: ${{ !inputs.existing }}
+        with:
+          pattern: digest-*
+          path: ${{ runner.temp }}/digests
+          merge-multiple: true
+      - name: Merge architecture manifests
+        if: ${{ !inputs.existing }}
+        env:
+          TAG: ${{ inputs.tag }}
+        run: |
+          set -euo pipefail
+          sources=()
+          for arch in amd64 arm64; do
+            digest=$(cat "$RUNNER_TEMP/digests/$arch")
+            [[ "$digest" =~ ^sha256:[0-9a-f]{64}$ ]]
+            sources+=("$IMAGE@$digest")
+          done
+          docker buildx imagetools create --tag "$IMAGE:$TAG" "${sources[@]}"
+      - name: Verify published platforms
+        env:
+          TAG: ${{ inputs.tag }}
+        run: |
+          set -euo pipefail
+          docker buildx imagetools inspect --raw "$IMAGE:$TAG" | jq -e '
+            [.manifests[].platform | select(.os == "linux") | .architecture]
+            | unique | sort == ["amd64", "arm64"]'
+
+      - name: Create release and promote the newest version
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ inputs.tag }}
+        run: |
+          set -euo pipefail
+          # Read failures abort; they must not be mistaken for a missing release.
+          releases=$(gh api --paginate "repos/$GITHUB_REPOSITORY/releases?per_page=100" --jq '.[] | select(.draft == false and .prerelease == false) | .tag_name')
+          if ! grep -Fxq "$TAG" <<< "$releases"; then
+            gh release create "$TAG" --repo "$GITHUB_REPOSITORY" --verify-tag --title "Release $TAG" --generate-notes --latest=false
+          fi
+          newest=$(printf '%s\n%s\n' "$releases" "$TAG" | grep -E '^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$' | sort -V | tail -n 1)
+          if [[ "$TAG" == "$newest" ]]; then
+            docker buildx imagetools create --tag "$IMAGE:latest" "$IMAGE:$TAG"
+            gh release edit "$TAG" --repo "$GITHUB_REPOSITORY" --latest
+          fi

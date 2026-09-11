@@ -5,17 +5,47 @@ on:
   push:
     branches: [main]
   workflow_call:
+    inputs:
+      ref:
+        description: Exact release source SHA; always runs full validation
+        type: string
+        default: ""
 
 permissions:
   contents: read
 
 jobs:
-  validate:
-    runs-on: ubuntu-latest
+  scope:
+    runs-on: ubuntu-24.04
+    outputs:
+      full: ${{ steps.release.outputs.full || steps.changes.outputs.full }}
+      docs: ${{ steps.changes.outputs.docs }}
+      workflows: ${{ steps.changes.outputs.workflows }}
+      image: ${{ steps.changes.outputs.image }}
+    steps:
+      - uses: actions/checkout@v4
+        if: inputs.ref == ''
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Classify changed files and branch intent
+        if: inputs.ref == ''
+        id: changes
+        run: node .github/scripts/classify-changes.cjs
+      - name: Require full release validation
+        if: inputs.ref != ''
+        id: release
+        run: echo 'full=true' >> "$GITHUB_OUTPUT"
+
+  application:
+    needs: scope
+    if: needs.scope.outputs.full == 'true'
+    runs-on: ubuntu-24.04
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
         with:
+          ref: ${{ inputs.ref || github.sha }}
           persist-credentials: false
       - uses: pnpm/action-setup@v4
       - uses: actions/setup-node@v4
@@ -27,3 +57,65 @@ jobs:
       - run: pnpm lint
       - run: pnpm test
       - run: pnpm build
+
+  workflows:
+    needs: scope
+    if: needs.scope.outputs.workflows == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - run: node --test .github/scripts/*.test.cjs
+      - name: Validate all workflow definitions
+        run: docker run --rm -v "$PWD:/repo" -w /repo rhysd/actionlint:1.7.12 -shellcheck=''
+
+  docs:
+    needs: scope
+    if: needs.scope.outputs.docs == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Check documentation for merge conflict markers
+        run: |
+          if git grep -n -E '^(<<<<<<< |>>>>>>> )' -- '*.md'; then
+            echo 'Unresolved merge conflict markers in documentation'; exit 1
+          fi
+
+  image:
+    needs: scope
+    if: needs.scope.outputs.image == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: docker/Dockerfile
+          platforms: linux/amd64
+          push: false
+          cache-from: type=gha,scope=webotp-ci-amd64
+          cache-to: type=gha,mode=max,scope=webotp-ci-amd64
+
+  # Stable required check even when some categories are intentionally skipped.
+  validate:
+    needs: [scope, application, workflows, docs, image]
+    if: always()
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: Require all selected checks to succeed
+        env:
+          RESULTS: ${{ toJSON(needs) }}
+        run: |
+          echo "$RESULTS" | jq -e '
+            .scope.result == "success" and
+            ([.[] .result] | all(. == "success" or . == "skipped"))'
