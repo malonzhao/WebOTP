@@ -1,6 +1,6 @@
 {
   "name": "webotp",
-  "version": "1.0.4",
+  "version": "1.0.6",
   "description": "A web application for one-time password.",
   "scripts": {
     "dev": "pnpm -r --parallel dev",
