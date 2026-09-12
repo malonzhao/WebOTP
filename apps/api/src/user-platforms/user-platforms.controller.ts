@@ -9,8 +9,11 @@ import {
   HttpStatus,
   UseGuards,
   Query,
+  UsePipes,
+  ValidationPipe,
 } from "@nestjs/common";
 import { UserPlatformsService } from "./user-platforms.service";
+import { BatchOtpDto } from "./dto/batch-otp.dto";
 import { CreateUserPlatformDto } from "./dto/create-user-platform.dto";
 import { JwtAuthGuard } from "../auth/guards/jwt-auth.guard";
 import { GetUser } from "../auth/decorators/get-user.decorator";
@@ -47,6 +50,22 @@ export class UserPlatformsController {
   @HttpCode(HttpStatus.NO_CONTENT)
   async delete(@Param("id") id: string, @GetUser() user: TokenPayload) {
     return this.userPlatformsService.delete(id, user.sub);
+  }
+
+  @Post("otp/batch")
+  @UsePipes(
+    new ValidationPipe({
+      whitelist: true,
+      forbidNonWhitelisted: true,
+      transform: true,
+    }),
+  )
+  @HttpCode(HttpStatus.OK)
+  async generateBatchOTP(
+    @Body() body: BatchOtpDto,
+    @GetUser() user: TokenPayload,
+  ) {
+    return this.userPlatformsService.generateBatchOTP(body.ids, user.sub);
   }
 
   @Post(":id/otp")

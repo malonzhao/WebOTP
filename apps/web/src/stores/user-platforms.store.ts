@@ -10,21 +10,24 @@ interface UserPlatformsState {
   isLoading: boolean;
   isLoadingMore: boolean;
   error: string | null;
-  otpData: Map<string, OTPResponse>;
+  otpData: Map<string, OTPResponse & { localExpiresAt: number }>;
+  refreshingPlatforms: Set<string>;
   hasMore: boolean;
   nextPage: number | null;
   loadUserPlatforms: (page?: number, limit?: number) => Promise<void>;
   loadMoreUserPlatforms: (limit?: number) => Promise<void>;
   createUserPlatform: (data: CreateUserPlatformDto) => Promise<UserPlatformWithPlatform>;
   deleteUserPlatform: (id: string) => Promise<void>;
-  generateOTP: (id: string) => Promise<OTPResponse>;
+  refreshOTPs: (ids: string[]) => Promise<void>;
   clearError: () => void;
   clearOTPData: (id: string) => void;
   resetUserPlatforms: () => void;
 }
 
 export const useUserPlatformsStore = create<UserPlatformsState>((set, get) => {
-  const ongoingOTPGenerations = new Set<string>();
+  let activeRefresh: Promise<void> | null = null;
+  let generation = 0;
+  let retryAt = 0;
 
   return {
     userPlatforms: [],
@@ -34,6 +37,7 @@ export const useUserPlatformsStore = create<UserPlatformsState>((set, get) => {
     isLoadingMore: false,
     error: null,
     otpData: new Map(),
+    refreshingPlatforms: new Set(),
     hasMore: true,
     nextPage: null,
 
@@ -110,24 +114,60 @@ export const useUserPlatformsStore = create<UserPlatformsState>((set, get) => {
       }
     },
 
-    generateOTP: async (id) => {
-      if (ongoingOTPGenerations.has(id)) {
-        throw new Error('OTP generation already in progress for this platform');
+    refreshOTPs: async (ids) => {
+      const currentGeneration = generation;
+      // Share the in-flight request, then recheck which newly loaded IDs still need data.
+      if (activeRefresh) {
+        await activeRefresh;
+        if (generation !== currentGeneration) return;
+        return get().refreshOTPs(ids);
       }
-      ongoingOTPGenerations.add(id);
-      set({ error: null });
-      try {
-        const otpResponse = await userPlatformsService.generateOTP(id);
-        set(state => ({ otpData: new Map(state.otpData).set(id, otpResponse) }));
-        return otpResponse;
-      } catch (error: any) {
-        set({
-          error: error.response?.data?.message || i18n.t('errors.generateOTPFailed'),
-        });
-        throw error;
-      } finally {
-        ongoingOTPGenerations.delete(id);
-      }
+      if (Date.now() < retryAt) return;
+      const loaded = new Set(get().userPlatforms.map(item => item.id));
+      const needed = [...new Set(ids)].filter(id => loaded.has(id) &&
+        (get().otpData.get(id)?.localExpiresAt ?? 0) <= Date.now());
+      if (!needed.length) return;
+      set({ refreshingPlatforms: new Set(needed), error: null });
+      const request = (async () => {
+        try {
+          for (let start = 0; start < needed.length; start += 200) {
+            const requestedAt = Date.now();
+            const response = await userPlatformsService.generateBatchOTP(needed.slice(start, start + 200));
+            const receivedAt = Date.now();
+            if (generation !== currentGeneration) return;
+            // Midpoint clock calibration estimates transit time; never count timer ticks.
+            const localExpiresAt = receivedAt + response.expiresAt - response.serverTime -
+              (receivedAt - requestedAt) / 2;
+            set(state => {
+              const otpData = new Map(state.otpData);
+              const currentIds = new Set(state.userPlatforms.map(item => item.id));
+              for (const item of response.items) {
+                if (currentIds.has(item.id)) otpData.set(item.id, {
+                  token: item.token,
+                  expiresIn: Math.ceil((response.expiresAt - response.serverTime) / 1000),
+                  serverTime: response.serverTime,
+                  expiresAt: response.expiresAt,
+                  localExpiresAt,
+                });
+              }
+              return { otpData };
+            });
+          }
+          // Avoid a request loop if a slow response has already expired.
+          if (needed.some(id => (get().otpData.get(id)?.localExpiresAt ?? Infinity) <= Date.now())) {
+            retryAt = Date.now() + 1000;
+          }
+        } catch (error: any) {
+          if (generation !== currentGeneration) return;
+          retryAt = Date.now() + 5000;
+          set({ error: error.response?.data?.message || i18n.t('errors.generateOTPFailed') });
+        } finally {
+          if (generation === currentGeneration) set({ refreshingPlatforms: new Set() });
+        }
+      })();
+      activeRefresh = request;
+      await request;
+      if (activeRefresh === request) activeRefresh = null;
     },
 
     clearError: () => set({ error: null }),
@@ -136,12 +176,22 @@ export const useUserPlatformsStore = create<UserPlatformsState>((set, get) => {
       otpData.delete(id);
       return { otpData };
     }),
-    resetUserPlatforms: () => set({
-      userPlatforms: [],
-      total: 0,
-      currentPage: 1,
-      hasMore: true,
-      nextPage: null,
-    }),
+    resetUserPlatforms: () => {
+      generation += 1;
+      activeRefresh = null;
+      retryAt = 0;
+      set({
+        otpData: new Map(),
+        refreshingPlatforms: new Set(),
+        userPlatforms: [],
+        total: 0,
+        currentPage: 1,
+        hasMore: true,
+        nextPage: null,
+        isLoading: false,
+        isLoadingMore: false,
+        error: null,
+      });
+    },
   };
 });

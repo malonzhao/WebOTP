@@ -32,7 +32,8 @@ const Dashboard: React.FC = () => {
     loadUserPlatforms,
     loadMoreUserPlatforms,
     createUserPlatform,
-    generateOTP,
+    refreshOTPs,
+    refreshingPlatforms,
     otpData,
     deleteUserPlatform,
     clearOTPData,
@@ -52,9 +53,9 @@ const Dashboard: React.FC = () => {
   const [formErrors, setFormErrors] = useState<Partial<typeof newPlatform>>({});
   const [platformManagementFormErrors, setPlatformManagementFormErrors] = useState<Partial<typeof newPlatformManagement>>({});
   const [platformsError, setPlatformsError] = useState<string | null>(null);
-  const [otpCountdowns, setOtpCountdowns] = useState<Map<string, number>>(new Map());
-  const [refreshingPlatforms, setRefreshingPlatforms] = useState<Set<string>>(new Set());
-  const refreshingPlatformsRef = useRef<Set<string>>(new Set());
+  const [now, setNow] = useState(Date.now());
+  const remainingSeconds = (id: string) => Math.max(0,
+    Math.ceil(((otpData.get(id)?.localExpiresAt ?? 0) - Math.max(now, Date.now())) / 1000));
   const userPlatformsLoadedRef = useRef(false);
   const platformsLoadedRef = useRef(false);
   const [copiedOtpId, setCopiedOtpId] = useState<string | null>(null);
@@ -76,17 +77,6 @@ const Dashboard: React.FC = () => {
       loadUserPlatforms();
     }
   }, [isAuthenticated, loadUserPlatforms]);
-
-  // Automatically generate OTP codes when user platform list is loaded
-  useEffect(() => {
-    if (userPlatforms) {
-      userPlatforms.forEach(platform => {
-        if (!otpData.has(platform.id)) {
-          handleGenerateOTP(platform.id);
-        }
-      });
-    }
-  }, [userPlatforms]); // Removed otpData dependency to prevent infinite re-render
 
   useEffect(() => {
     // Load platform list to ensure platform names can be displayed
@@ -122,50 +112,25 @@ const Dashboard: React.FC = () => {
     }
   }, [showPlatformsManagement]);
 
-  // OTP countdown timer, automatically refresh OTP when countdown ends
+  // Timers only trigger rendering. Expiry is derived from an absolute deadline.
   useEffect(() => {
-    const timer = setInterval(() => {
-      setOtpCountdowns(prev => {
-        const newCountdowns = new Map(prev);
-        let hasChanges = false;
-        const expiredPlatforms: string[] = []; // Track expired platforms
-
-        newCountdowns.forEach((value, key) => {
-          // Check if platform still exists before processing
-          const platformExists = userPlatforms.some(platform => platform.id === key);
-          if (!platformExists) {
-            // Platform has been deleted, remove its countdown
-            newCountdowns.delete(key);
-            hasChanges = true;
-            return;
-          }
-
-          if (value > 0) {
-            newCountdowns.set(key, value - 1);
-            hasChanges = true;
-          } else {
-            // Countdown ended, mark for refresh
-            expiredPlatforms.push(key);
-            newCountdowns.delete(key);
-            hasChanges = true;
-          }
-        });
-
-        // Refresh expired platforms outside the state update
-        if (expiredPlatforms.length > 0) {
-          setTimeout(() => {
-            expiredPlatforms.forEach(platformId => {
-              handleGenerateOTP(platformId);
-            });
-          }, 0);
-        }
-
-        return hasChanges ? newCountdowns : prev;
-      });
-    }, 1000);
-
-    return () => clearInterval(timer);
-  }, [userPlatforms]);
+    const synchronize = () => {
+      if (document.visibilityState === 'hidden') return;
+      setNow(Date.now());
+      if (isAuthenticated) void refreshOTPs(userPlatforms.map(platform => platform.id));
+    };
+    synchronize();
+    const timer = window.setInterval(synchronize, 250);
+    document.addEventListener('visibilitychange', synchronize);
+    window.addEventListener('pageshow', synchronize);
+    window.addEventListener('online', synchronize);
+    return () => {
+      window.clearInterval(timer);
+      document.removeEventListener('visibilitychange', synchronize);
+      window.removeEventListener('pageshow', synchronize);
+      window.removeEventListener('online', synchronize);
+    };
+  }, [isAuthenticated, userPlatforms, refreshOTPs]);
 
   // Infinite scroll: load more data when scrolling to bottom
   useEffect(() => {
@@ -191,56 +156,11 @@ const Dashboard: React.FC = () => {
 
 
   const handleGenerateOTP = async (platformId: string, e?: React.MouseEvent) => {
-    if (e) {
-      e.preventDefault();
-      e.stopPropagation();
-    }
-    // Check if platform still exists before generating OTP
-    const platformExists = userPlatforms.some(platform => platform.id === platformId);
-    if (!platformExists) {
-      // Platform has been deleted, clear any related data
-      clearOTPData(platformId);
-      setOtpCountdowns(prev => {
-        const newCountdowns = new Map(prev);
-        newCountdowns.delete(platformId);
-        return newCountdowns;
-      });
-      return;
-    }
-    // Use ref for synchronous check to avoid duplicate requests
-    if (refreshingPlatformsRef.current.has(platformId)) {
-      return;
-    }
-    // Synchronously update ref and state
-    refreshingPlatformsRef.current.add(platformId);
-    setRefreshingPlatforms(prev => new Set(prev).add(platformId));
-
-    try {
-      const otpResponse = await generateOTP(platformId);
-      // Immediately update countdown to new validity period, ensuring countdown starts from beginning after manual refresh
-      setOtpCountdowns(prev => {
-        const newCountdowns = new Map(prev);
-        newCountdowns.set(platformId, otpResponse.expiresIn);
-        return newCountdowns;
-      });
-    } catch (error: any) {
-      // Do not log duplicate generation errors
-      if (error.message !== 'OTP generation already in progress for this platform') {
-        console.error('Failed to generate OTP:', error);
-      }
-    } finally {
-      // Synchronously update ref and state
-      refreshingPlatformsRef.current.delete(platformId);
-      setRefreshingPlatforms(prev => {
-        const newSet = new Set(prev);
-        newSet.delete(platformId);
-        return newSet;
-      });
-    }
+    e?.preventDefault();
+    e?.stopPropagation();
+    await refreshOTPs([platformId]);
+    setNow(Date.now());
   };
-
-
-
 
   const handleBindPlatform = async (e?: React.MouseEvent) => {
     if (e) {
@@ -284,19 +204,6 @@ const Dashboard: React.FC = () => {
       await deleteUserPlatform(platformId);
       // After successful deletion, clear all related data for this platform
       clearOTPData(platformId);
-      // Clear countdown data
-      setOtpCountdowns(prev => {
-        const newCountdowns = new Map(prev);
-        newCountdowns.delete(platformId);
-        return newCountdowns;
-      });
-      // Clear refreshing state
-      setRefreshingPlatforms(prev => {
-        const newSet = new Set(prev);
-        newSet.delete(platformId);
-        return newSet;
-      });
-      refreshingPlatformsRef.current.delete(platformId);
     } catch (error) {
       console.error('Failed to delete platform:', error);
     }
@@ -503,14 +410,14 @@ const Dashboard: React.FC = () => {
                 <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center text-xs text-gray-400 dark:text-gray-500 mb-3 space-y-1 sm:space-y-0">
                   <span className="truncate">{t('dashboard.boundAt')}: {format(new Date(platform.createdAt), 'yyyy-MM-dd HH:mm', { locale: currentLocale })}</span>
                   {otpData.get(platform.id) && (
-                    <span className="truncate">{t('dashboard.expiresIn')} {otpCountdowns.get(platform.id) ?? otpData.get(platform.id)?.expiresIn} {t('dashboard.seconds')}</span>
+                    <span className="truncate">{t('dashboard.expiresIn')} {remainingSeconds(platform.id)} {t('dashboard.seconds')}</span>
                   )}
                 </div>
 
                 {otpData.get(platform.id) && (
                   <div
                     className="bg-gray-50 dark:bg-gray-700 p-3 rounded-md border border-gray-200 dark:border-gray-600 relative cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600 transition-colors"
-                    onClick={() => handleCopyOTP(platform.id, otpData.get(platform.id)?.token || '')}
+                    onClick={() => { if (remainingSeconds(platform.id) > 0) handleCopyOTP(platform.id, otpData.get(platform.id)?.token || ''); }}
                   >
                     <div className="absolute top-2 right-2">
                       {copiedOtpId === platform.id ? (
@@ -520,7 +427,7 @@ const Dashboard: React.FC = () => {
                       )}
                     </div>
                     <p className="text-2xl sm:text-3xl font-bold text-blue-600 dark:text-blue-400 text-center tracking-widest">
-                      {otpData.get(platform.id)?.token}
+                      {remainingSeconds(platform.id) > 0 ? otpData.get(platform.id)?.token : '------'}
                     </p>
                   </div>
                 )}

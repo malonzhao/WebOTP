@@ -21,7 +21,11 @@ export class UserPlatformsService {
     userId: string,
     page: number = 1,
     limit: number = 20,
-  ): Promise<{ data: UserPlatformWithPlatform[]; total: number; hasMore: boolean }> {
+  ): Promise<{
+    data: UserPlatformWithPlatform[];
+    total: number;
+    hasMore: boolean;
+  }> {
     return this.userPlatformsRepository.findAllByUserId(userId, page, limit);
   }
 
@@ -86,24 +90,41 @@ export class UserPlatformsService {
     await this.userPlatformsRepository.delete(id);
   }
 
-  async generateOTP(
-    id: string,
-    userId: string,
-  ): Promise<{ token: string; expiresIn: number }> {
-    await this.findById(id, userId);
-    const secret = await this.userPlatformsRepository.getDecryptedSecret(id);
+  async generateBatchOTP(ids: string[], userId: string) {
+    // Authorize every requested binding before decrypting any secret.
+    const uniqueIds = [...new Set(ids)];
+    await Promise.all(uniqueIds.map((id) => this.findById(id, userId)));
+    const secrets = await Promise.all(
+      uniqueIds.map((id) =>
+        this.userPlatformsRepository.getDecryptedSecret(id),
+      ),
+    );
+    // A single sample keeps all codes and expiry metadata in the same window.
+    const serverTime = Date.now();
+    const expiresAt = (Math.floor(serverTime / 30000) + 1) * 30000;
+    const items = uniqueIds.map((id, index) => ({
+      id,
+      token: speakeasy.totp({
+        secret: secrets[index],
+        encoding: "base32",
+        time: serverTime / 1000,
+        step: 30,
+      }),
+    }));
+    return { items, serverTime, expiresAt };
+  }
 
-    const token = speakeasy.totp({
-      secret: secret,
-      encoding: "base32",
-    });
-
-    // Calculate remaining time in 30-second cycle for current time
-    const currentTime = Math.floor(Date.now() / 1000); // Current timestamp (seconds)
-    const timeStep = 30; // TOTP time step (seconds)
-    const remainingTime = timeStep - (currentTime % timeStep);
-
-    return { token, expiresIn: remainingTime };
+  async generateOTP(id: string, userId: string) {
+    const { items, serverTime, expiresAt } = await this.generateBatchOTP(
+      [id],
+      userId,
+    );
+    return {
+      token: items[0].token,
+      expiresIn: Math.ceil((expiresAt - serverTime) / 1000),
+      serverTime,
+      expiresAt,
+    };
   }
 
   async verifyOTP(id: string, userId: string, token: string): Promise<boolean> {
