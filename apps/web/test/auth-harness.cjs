@@ -6,7 +6,7 @@ const axios = require('axios');
 
 // Execute the production TypeScript with real Axios and Zustand. Only browser
 // globals and the HTTP adapter are replaced; TypeScript is checked by the build.
-function setup(adapter, mocks = {}) {
+function setup(adapter, mocks = {}, globals = {}) {
   const cache = new Map();
   const values = new Map();
   const storage = {
@@ -29,7 +29,7 @@ function setup(adapter, mocks = {}) {
       compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020, esModuleInterop: true },
     });
     vm.runInNewContext(outputText, {
-      exports, window, localStorage: storage, CustomEvent,
+      exports, window, localStorage: storage, CustomEvent, ...globals,
       console: { log() {}, warn() {}, error() {} },
       require(name) {
         if (mocks[name]) return mocks[name];

@@ -10,6 +10,8 @@ export interface CreateUserPlatformDto {
 export interface OTPResponse {
   token: string;
   expiresIn: number;
+  serverTime: number;
+  expiresAt: number;
 }
 
 export class UserPlatformsService {
@@ -23,6 +25,14 @@ export class UserPlatformsService {
 
   async delete(id: string): Promise<void> {
     return apiClient.delete(`/user-platforms/${id}`);
+  }
+
+  async generateBatchOTP(ids: string[]): Promise<{
+    items: { id: string; token: string }[];
+    serverTime: number;
+    expiresAt: number;
+  }> {
+    return apiClient.post('/user-platforms/otp/batch', { ids });
   }
 
   async generateOTP(id: string): Promise<OTPResponse> {
