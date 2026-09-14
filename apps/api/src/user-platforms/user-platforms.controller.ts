@@ -29,11 +29,13 @@ export class UserPlatformsController {
     @GetUser() user: TokenPayload,
     @Query("page") page: string = "1",
     @Query("limit") limit: string = "20",
+    @Query("search") search: string = "",
   ) {
     return this.userPlatformsService.findAllByUserId(
       user.sub,
       parseInt(page),
       parseInt(limit),
+      search.trim().slice(0, 200),
     );
   }
 

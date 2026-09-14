@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useAuthStore } from '../../stores/auth.store';
+import { FormErrors } from '../common/FormErrors';
 import { LoginDto } from '../../services/api/dto/auth.dto';
 
 export const LoginForm: React.FC = () => {
@@ -65,6 +66,7 @@ export const LoginForm: React.FC = () => {
       </h3>
 
       <form onSubmit={handleSubmit} className="mt-4 space-y-4" noValidate>
+        <FormErrors errors={errors} labels={{ username: t('auth.username'), password: t('auth.password') }} />
         <div>
           <label htmlFor="username" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
             {t('auth.username')}
@@ -73,13 +75,16 @@ export const LoginForm: React.FC = () => {
             type="text"
             id="username"
             name="username"
+            autoComplete="username"
+            aria-invalid={!!errors.username}
+            aria-describedby={errors.username ? 'username-error' : undefined}
             value={formData.username}
             onChange={handleInputChange}
             className={`mt-1 block w-full px-3 py-2 border rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white dark:border-gray-600 dark:placeholder-gray-400 ${errors.username ? 'border-red-500 dark:border-red-400 input-error' : 'border-gray-300 dark:border-gray-600'}`}
             placeholder={t('auth.username')}
           />
           {errors.username && (
-            <p className="mt-1 text-sm text-danger-600 dark:text-danger-400">{errors.username}</p>
+            <p id="username-error" className="mt-1 text-sm text-danger-600 dark:text-danger-400">{errors.username}</p>
           )}
         </div>
 
@@ -91,18 +96,21 @@ export const LoginForm: React.FC = () => {
             type="password"
             id="password"
             name="password"
+            autoComplete="current-password"
+            aria-invalid={!!errors.password}
+            aria-describedby={errors.password ? 'password-error' : undefined}
             value={formData.password}
             onChange={handleInputChange}
             className={`mt-1 block w-full px-3 py-2 border rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white dark:border-gray-600 dark:placeholder-gray-400 ${errors.password ? 'border-red-500 dark:border-red-400 input-error' : 'border-gray-300 dark:border-gray-600'}`}
             placeholder={t('auth.password')}
           />
           {errors.password && (
-            <p className="mt-1 text-sm text-danger-600 dark:text-danger-400">{errors.password}</p>
+            <p id="password-error" className="mt-1 text-sm text-danger-600 dark:text-danger-400">{errors.password}</p>
           )}
         </div>
 
         {error && (
-          <div className="rounded-md bg-danger-50 dark:bg-danger-900/20 p-4">
+          <div role="alert" className="rounded-md bg-danger-50 dark:bg-danger-900/20 p-4">
             <p className="text-sm text-danger-800 dark:text-danger-200">{error}</p>
           </div>
         )}

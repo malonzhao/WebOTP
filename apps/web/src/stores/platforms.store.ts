@@ -15,7 +15,7 @@ interface PlatformsState {
 
   // Actions
   loadPlatforms: (page?: number, limit?: number) => Promise<void>;
-  createPlatform: (data: CreatePlatformDto) => Promise<void>;
+  createPlatform: (data: CreatePlatformDto) => Promise<Platform>;
   updatePlatform: (id: string, data: UpdatePlatformDto) => Promise<void>;
   deletePlatform: (id: string) => Promise<void>;
   clearError: () => void;
@@ -35,8 +35,14 @@ export const usePlatformsStore = create<PlatformsState>((set) => ({
     set({ isLoading: true, error: null });
     try {
       const response = await platformsService.findAll(page, limit);
+      const allPlatforms = [...response.platforms];
+      for (let next = page + 1; allPlatforms.length < response.total; next += 1) {
+        const more = await platformsService.findAll(next, limit);
+        if (!more.platforms.length) break;
+        allPlatforms.push(...more.platforms);
+      }
       set({
-        platforms: response.platforms,
+        platforms: allPlatforms,
         pagination: {
           page,
           limit,
@@ -61,6 +67,7 @@ export const usePlatformsStore = create<PlatformsState>((set) => ({
         platforms: [...state.platforms, newPlatform],
         isLoading: false
       }));
+      return newPlatform;
     } catch (error: any) {
       set({
         error: error.response?.data?.message || i18n.t('errors.createPlatformFailed'),

@@ -44,19 +44,27 @@ export class UserPlatformsRepository {
     userId: string,
     page: number = 1,
     limit: number = 20,
+    search: string = "",
   ): Promise<{ data: UserPlatformWithPlatform[]; total: number; hasMore: boolean }> {
     const skip = (page - 1) * limit;
+    const where = {
+      userId,
+      ...(search ? { OR: [
+        { accountName: { contains: search } },
+        { platform: { name: { contains: search } } },
+      ] } : {}),
+    };
 
     const [data, total] = await Promise.all([
       this.prisma.userPlatform.findMany({
-        where: { userId },
+        where,
         include: { platform: true },
         orderBy: { createdAt: "desc" },
         skip,
         take: Number(limit),
       }),
       this.prisma.userPlatform.count({
-        where: { userId },
+        where,
       }),
     ]);
 

@@ -48,3 +48,22 @@
     @apply border-danger-500 focus:border-danger-500 focus:ring-danger-500 dark:border-danger-600 dark:focus:border-danger-600 dark:focus:ring-danger-600;
   }
 }
+@layer components {
+  .field { @apply block min-h-11 w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-base text-gray-900 placeholder:text-gray-500 dark:placeholder:text-gray-300 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100; }
+  .field-label { @apply mb-1 block text-sm font-medium text-gray-700 dark:text-gray-200; }
+  .field-error { @apply mt-1 text-sm text-red-700 dark:text-red-300; }
+  .error-message { @apply rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-800 dark:border-red-800 dark:bg-red-950 dark:text-red-200; }
+  .icon-button { @apply inline-flex min-h-11 min-w-11 items-center justify-center rounded-lg p-2 text-gray-600 hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-40 dark:text-gray-300 dark:hover:bg-gray-700; }
+  .menu-action { @apply flex min-h-11 w-full items-center gap-2 rounded-md px-3 py-2 text-left text-sm; }
+  .btn-primary, .btn-secondary, .btn-danger { @apply min-h-11 rounded-lg disabled:cursor-not-allowed disabled:opacity-50; }
+  .btn-secondary { @apply border border-gray-300 bg-white text-gray-700 hover:bg-gray-100 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200 dark:hover:bg-gray-700; }
+}
+
+button:focus-visible, a:focus-visible, [tabindex]:focus-visible {
+  outline: 2px solid #2563eb;
+  outline-offset: 3px;
+}
+.dark button:focus-visible, .dark a:focus-visible, .dark [tabindex]:focus-visible { outline-color: #93c5fd; }
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; transition-duration: 0.01ms !important; scroll-behavior: auto !important; }
+}

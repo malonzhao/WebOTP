@@ -26,7 +26,7 @@ const languageOptions: LanguageOption[] = [
 ];
 
 const LanguageSwitcher: React.FC = () => {
-  const { i18n } = useTranslation();
+  const { i18n, t } = useTranslation();
 
   const handleLanguageChange = (languageCode: string) => {
     i18n.changeLanguage(languageCode);
@@ -39,9 +39,10 @@ const LanguageSwitcher: React.FC = () => {
   return (
     <div className="relative inline-block">
       <select
+        aria-label={t('language.switchLanguage')}
         value={currentLanguage}
         onChange={(e) => handleLanguageChange(e.target.value)}
-        className="appearance-none bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-md px-2 py-1 pr-8 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:text-white"
+        className="appearance-none bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-md min-h-11 px-2 py-2 pr-8 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:text-white"
       >
         {languageOptions.map((language) => (
           <option key={language.code} value={language.code}>
@@ -51,6 +52,7 @@ const LanguageSwitcher: React.FC = () => {
       </select>
       <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-gray-700 dark:text-gray-300">
         <svg
+          aria-hidden="true"
           className="h-4 w-4"
           fill="none"
           stroke="currentColor"

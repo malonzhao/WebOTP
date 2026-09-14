@@ -15,8 +15,8 @@ export interface OTPResponse {
 }
 
 export class UserPlatformsService {
-  async findAll(page: number = 1, limit: number = 20): Promise<{ data: UserPlatformWithPlatform[]; total: number; hasMore: boolean }> {
-    return apiClient.get(`/user-platforms?page=${page}&limit=${limit}`);
+  async findAll(page: number = 1, limit: number = 20, search: string = ''): Promise<{ data: UserPlatformWithPlatform[]; total: number; hasMore: boolean }> {
+    return apiClient.get(`/user-platforms?page=${page}&limit=${limit}&search=${encodeURIComponent(search)}`);
   }
 
   async create(createUserPlatformDto: CreateUserPlatformDto): Promise<UserPlatformWithPlatform> {
