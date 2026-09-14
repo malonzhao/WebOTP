@@ -27,7 +27,8 @@
     "no": "否",
     "ok": "確定",
     "settings": "設定",
-    "profile": "个人资料"
+    "profile": "个人资料",
+    "retry": "重試"
   },
   "auth": {
     "login": "登入",
@@ -68,8 +69,8 @@
   "dashboard": {
     "title": "OTP 管理平台",
     "platformManagement": "平台管理",
-    "bindPlatform": "綁定平台",
-    "boundPlatforms": "已綁定的平台",
+    "bindPlatform": "新增帳戶",
+    "boundPlatforms": "我的帳戶",
     "accountName": "帳戶名稱",
     "otpSecret": "OTP 密鑰",
     "selectPlatform": "請選擇平台",
@@ -82,7 +83,28 @@
     "platform": "平台",
     "createdAt": "建立時間",
     "actions": "操作",
-    "clickToBind": "點擊綁定新平台"
+    "clickToBind": "點擊綁定新平台",
+    "subtitle": "找到所需帳戶，複製目前的驗證碼。",
+    "searchAccounts": "搜尋全部帳戶或平台",
+    "accountCount": "共 {{count}} 個帳戶",
+    "copiedAccount": "已複製 {{account}} 的驗證碼",
+    "copyFailed": "複製失敗，請選取驗證碼後手動複製。",
+    "accountAdded": "帳戶已新增",
+    "deleted": "刪除成功",
+    "accountActions": "{{account}} 的更多操作",
+    "copyAccount": "複製 {{account}} 的驗證碼",
+    "expiring": "{{count}} 秒後過期 · 即將更新",
+    "remaining": "有效期限剩餘 {{count}} 秒",
+    "updating": "正在更新驗證碼…",
+    "waitingRetry": "驗證碼暫時無法使用 · 正在自動重試",
+    "noResults": "找不到符合的帳戶",
+    "trySearch": "請嘗試其他帳戶名稱或平台名稱。",
+    "emptyTitle": "新增第一個帳戶",
+    "emptyHint": "選擇平台，填入其兩步驟驗證設定提供的金鑰，即可取得驗證碼。",
+    "clearSearch": "清除搜尋",
+    "loadMore": "載入更多帳戶",
+    "secretHint": "貼上平台兩步驟驗證設定提供的 Base32 金鑰，例如 JBSWY3DPEHPK3PXP。空格會自動移除。",
+    "deleteWarning": "此操作將從 WebOTP 移除該帳戶及儲存的金鑰，此處將無法再提供驗證碼。刪除前請確認有其他驗證器或復原方式。"
   },
   "platforms": {
     "platformManagement": "平台管理",
@@ -102,7 +124,8 @@
     "invalidFormat": "格式不正確",
     "minLength": "至少需要{{count}}個字元",
     "maxLength": "最多{{count}}個字元",
-    "urlInvalid": "請輸入有效的URL"
+    "urlInvalid": "請輸入有效的URL",
+    "checkFields": "請檢查以下欄位"
   },
   "errors": {
     "loadPlatformsFailed": "無法載入平台列表，請稍後重試",

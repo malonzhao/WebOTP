@@ -27,7 +27,8 @@
     "no": "No",
     "ok": "OK",
     "settings": "Settings",
-    "profile": "个人资料"
+    "profile": "个人资料",
+    "retry": "Retry"
   },
   "auth": {
     "login": "Login",
@@ -68,8 +69,8 @@
   "dashboard": {
     "title": "OTP Management Platform",
     "platformManagement": "Platform Management",
-    "bindPlatform": "Bind Platform",
-    "boundPlatforms": "Bound Platforms",
+    "bindPlatform": "Add account",
+    "boundPlatforms": "Your accounts",
     "accountName": "Account Name",
     "otpSecret": "OTP Secret",
     "selectPlatform": "Select Platform",
@@ -82,7 +83,30 @@
     "platform": "Platform",
     "createdAt": "Created At",
     "actions": "Actions",
-    "clickToBind": "Click to bind new platform"
+    "clickToBind": "Click to bind new platform",
+    "subtitle": "Find an account and copy its current code.",
+    "searchAccounts": "Search all accounts or platforms",
+    "accountCount": "{{count}} accounts",
+    "accountCount_one": "{{count}} account",
+    "accountCount_other": "{{count}} accounts",
+    "copiedAccount": "Copied code for {{account}}",
+    "copyFailed": "Copy failed. Select the code and copy it manually.",
+    "accountAdded": "Account added",
+    "deleted": "Deleted successfully",
+    "accountActions": "Actions for {{account}}",
+    "copyAccount": "Copy code for {{account}}",
+    "expiring": "Expires in {{count}}s · updating soon",
+    "remaining": "Valid for {{count}}s",
+    "updating": "Updating code…",
+    "waitingRetry": "Code unavailable · retrying automatically",
+    "noResults": "No matching accounts",
+    "trySearch": "Try a different account or platform name.",
+    "emptyTitle": "Add your first account",
+    "emptyHint": "Choose a platform and enter the setup key from its two-factor authentication settings.",
+    "clearSearch": "Clear search",
+    "loadMore": "Load more accounts",
+    "secretHint": "Paste the Base32 setup key from the platform’s two-factor authentication settings (for example, JBSWY3DPEHPK3PXP). Spaces are removed automatically.",
+    "deleteWarning": "This removes the account and its saved key from WebOTP. Codes will no longer be available here. Make sure you have another authenticator or recovery method before deleting."
   },
   "platforms": {
     "platformManagement": "Platform Management",
@@ -102,7 +126,8 @@
     "invalidFormat": "Invalid format",
     "minLength": "Must be at least {{count}} characters",
     "maxLength": "Must be at most {{count}} characters",
-    "urlInvalid": "Please enter a valid URL"
+    "urlInvalid": "Please enter a valid URL",
+    "checkFields": "Check the following fields"
   },
   "errors": {
     "loadPlatformsFailed": "Failed to load platform list, please try again later",

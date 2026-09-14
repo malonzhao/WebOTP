@@ -1,3 +1,4 @@
+import { FormErrors } from '../common/FormErrors';
 import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useAuthStore } from '../../stores/auth.store';
@@ -62,7 +63,7 @@ export const UserSettingsForm: React.FC<UserSettingsFormProps> = ({ onSuccess })
   useEffect(() => {
     if (updatePasswordSuccess) {
       // Show success message and close modal after 2 seconds
-      setTimeout(() => {
+      const timer = setTimeout(() => {
         clearUpdatePasswordState();
         // Clear form data
         setPasswordFormData({
@@ -73,13 +74,14 @@ export const UserSettingsForm: React.FC<UserSettingsFormProps> = ({ onSuccess })
         // Close modal
         onSuccess?.();
       }, 2000);
+      return () => clearTimeout(timer);
     }
   }, [updatePasswordSuccess, clearUpdatePasswordState, onSuccess]);
 
   useEffect(() => {
     if (updateUsernameSuccess) {
       // Show success message and close modal after 2 seconds
-      setTimeout(() => {
+      const timer = setTimeout(() => {
         clearUpdateUsernameState();
         // Clear form data
         setUsernameFormData({
@@ -88,6 +90,7 @@ export const UserSettingsForm: React.FC<UserSettingsFormProps> = ({ onSuccess })
         // Close modal
         onSuccess?.();
       }, 2000);
+      return () => clearTimeout(timer);
     }
   }, [updateUsernameSuccess, clearUpdateUsernameState, onSuccess]);
 
@@ -193,17 +196,15 @@ export const UserSettingsForm: React.FC<UserSettingsFormProps> = ({ onSuccess })
   };
 
   return (
-    <div className="w-full max-w-md transform overflow-hidden rounded-2xl bg-white dark:bg-gray-800 p-6 text-left align-middle shadow-xl">
-      <h3 className="text-lg font-medium leading-6 text-gray-900 dark:text-gray-100 text-center">
-        {t('auth.userSettings')}
-      </h3>
+    <div className="w-full">
 
       {/* Tabs */}
       <div className="mt-4 border-b border-gray-200 dark:border-gray-700">
-        <nav className="-mb-px flex space-x-8">
+        <nav className="-mb-px flex flex-wrap gap-x-4" aria-label={t('auth.userSettings')}>
           <button
             type="button"
             onClick={() => setActiveTab('username')}
+            aria-pressed={activeTab === 'username'}
             className={`whitespace-nowrap border-b-2 py-2 px-1 text-sm font-medium ${
               activeTab === 'username'
                 ? 'border-blue-500 text-blue-600 dark:border-blue-400 dark:text-blue-400'
@@ -215,6 +216,7 @@ export const UserSettingsForm: React.FC<UserSettingsFormProps> = ({ onSuccess })
           <button
             type="button"
             onClick={() => setActiveTab('password')}
+            aria-pressed={activeTab === 'password'}
             className={`whitespace-nowrap border-b-2 py-2 px-1 text-sm font-medium ${
               activeTab === 'password'
                 ? 'border-blue-500 text-blue-600 dark:border-blue-400 dark:text-blue-400'
@@ -229,8 +231,9 @@ export const UserSettingsForm: React.FC<UserSettingsFormProps> = ({ onSuccess })
       {/* Username Tab */}
       {activeTab === 'username' && (
         <form onSubmit={handleUsernameSubmit} className="mt-4 space-y-4" noValidate>
+          <FormErrors errors={usernameErrors} labels={{ username: t('auth.newUsername') }} />
           {updateUsernameSuccess && (
-            <div className="rounded-md bg-success-50 dark:bg-success-900/20 p-4">
+            <div role="status" className="rounded-md bg-success-50 dark:bg-success-900/20 p-4">
               <p className="text-sm text-success-800 dark:text-success-200">
                 {t('auth.usernameUpdatedSuccessfully')}
               </p>
@@ -253,15 +256,18 @@ export const UserSettingsForm: React.FC<UserSettingsFormProps> = ({ onSuccess })
               type="text"
               id="username"
               name="username"
+              autoComplete="username"
+              aria-invalid={!!usernameErrors.username}
+              aria-describedby={usernameErrors.username ? 'username-error' : undefined}
               value={usernameFormData.username}
               onChange={handleUsernameInputChange}
-              className={`w-full px-4 py-2 border rounded-md dark:bg-gray-700 dark:text-white dark:border-gray-600 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
+              className={`w-full min-h-11 px-4 py-2 pr-20 border rounded-md dark:bg-gray-700 dark:text-white dark:border-gray-600 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
                 usernameErrors.username ? 'border-red-500 dark:border-red-400' : 'border-gray-300 dark:border-gray-600'
               }`}
               placeholder={t('auth.newUsername')}
             />
             {usernameErrors.username && (
-              <p className="mt-1 text-sm text-danger-600 dark:text-danger-400">{usernameErrors.username}</p>
+              <p id="username-error" className="mt-1 text-sm text-danger-600 dark:text-danger-400">{usernameErrors.username}</p>
             )}
             <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
               {t('auth.usernameRequirements')}
@@ -269,7 +275,7 @@ export const UserSettingsForm: React.FC<UserSettingsFormProps> = ({ onSuccess })
           </div>
 
           {updateUsernameError && (
-            <div className="rounded-md bg-danger-50 dark:bg-danger-900/20 p-4">
+            <div role="alert" className="rounded-md bg-danger-50 dark:bg-danger-900/20 p-4">
               <p className="text-sm text-danger-800 dark:text-danger-200">{updateUsernameError}</p>
             </div>
           )}
@@ -289,8 +295,9 @@ export const UserSettingsForm: React.FC<UserSettingsFormProps> = ({ onSuccess })
       {/* Password Tab */}
       {activeTab === 'password' && (
         <form onSubmit={handlePasswordSubmit} className="mt-4 space-y-4" noValidate>
+          <FormErrors errors={passwordErrors} labels={{ currentPassword: t('auth.currentPassword'), newPassword: t('auth.newPassword'), confirmPassword: t('auth.confirmPassword') }} />
           {updatePasswordSuccess && (
-            <div className="rounded-md bg-success-50 dark:bg-success-900/20 p-4">
+            <div role="status" className="rounded-md bg-success-50 dark:bg-success-900/20 p-4">
               <p className="text-sm text-success-800 dark:text-success-200">
                 {t('auth.passwordUpdatedSuccessfully')}
               </p>
@@ -307,9 +314,12 @@ export const UserSettingsForm: React.FC<UserSettingsFormProps> = ({ onSuccess })
                 type={showPassword.current ? 'text' : 'password'}
                 id="currentPassword"
                 name="currentPassword"
+              autoComplete="current-password"
+              aria-invalid={!!passwordErrors.currentPassword}
+              aria-describedby={passwordErrors.currentPassword ? 'currentPassword-error' : undefined}
                 value={passwordFormData.currentPassword}
                 onChange={handlePasswordInputChange}
-                className={`w-full px-4 py-2 border rounded-md dark:bg-gray-700 dark:text-white dark:border-gray-600 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
+                className={`w-full min-h-11 px-4 py-2 pr-20 border rounded-md dark:bg-gray-700 dark:text-white dark:border-gray-600 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
                   passwordErrors.currentPassword ? 'border-red-500 dark:border-red-400' : 'border-gray-300 dark:border-gray-600'
                 }`}
                 placeholder={t('auth.currentPassword')}
@@ -323,7 +333,7 @@ export const UserSettingsForm: React.FC<UserSettingsFormProps> = ({ onSuccess })
               </button>
             </div>
             {passwordErrors.currentPassword && (
-              <p className="mt-1 text-sm text-danger-600 dark:text-danger-400">{passwordErrors.currentPassword}</p>
+              <p id="currentPassword-error" className="mt-1 text-sm text-danger-600 dark:text-danger-400">{passwordErrors.currentPassword}</p>
             )}
           </div>
 
@@ -337,9 +347,12 @@ export const UserSettingsForm: React.FC<UserSettingsFormProps> = ({ onSuccess })
                 type={showPassword.new ? 'text' : 'password'}
                 id="newPassword"
                 name="newPassword"
+              autoComplete="new-password"
+              aria-invalid={!!passwordErrors.newPassword}
+              aria-describedby={passwordErrors.newPassword ? 'newPassword-error' : undefined}
                 value={passwordFormData.newPassword}
                 onChange={handlePasswordInputChange}
-                className={`w-full px-4 py-2 border rounded-md dark:bg-gray-700 dark:text-white dark:border-gray-600 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
+                className={`w-full min-h-11 px-4 py-2 pr-20 border rounded-md dark:bg-gray-700 dark:text-white dark:border-gray-600 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
                   passwordErrors.newPassword ? 'border-red-500 dark:border-red-400' : 'border-gray-300 dark:border-gray-600'
                 }`}
                 placeholder={t('auth.newPassword')}
@@ -353,7 +366,7 @@ export const UserSettingsForm: React.FC<UserSettingsFormProps> = ({ onSuccess })
               </button>
             </div>
             {passwordErrors.newPassword && (
-              <p className="mt-1 text-sm text-danger-600 dark:text-danger-400">{passwordErrors.newPassword}</p>
+              <p id="newPassword-error" className="mt-1 text-sm text-danger-600 dark:text-danger-400">{passwordErrors.newPassword}</p>
             )}
             <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
               {t('auth.passwordRequirements')}
@@ -370,9 +383,12 @@ export const UserSettingsForm: React.FC<UserSettingsFormProps> = ({ onSuccess })
                 type={showPassword.confirm ? 'text' : 'password'}
                 id="confirmPassword"
                 name="confirmPassword"
+              autoComplete="new-password"
+              aria-invalid={!!passwordErrors.confirmPassword}
+              aria-describedby={passwordErrors.confirmPassword ? 'confirmPassword-error' : undefined}
                 value={passwordFormData.confirmPassword}
                 onChange={handlePasswordInputChange}
-                className={`w-full px-4 py-2 border rounded-md dark:bg-gray-700 dark:text-white dark:border-gray-600 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
+                className={`w-full min-h-11 px-4 py-2 pr-20 border rounded-md dark:bg-gray-700 dark:text-white dark:border-gray-600 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
                   passwordErrors.confirmPassword ? 'border-red-500 dark:border-red-400' : 'border-gray-300 dark:border-gray-600'
                 }`}
                 placeholder={t('auth.confirmPassword')}
@@ -386,12 +402,12 @@ export const UserSettingsForm: React.FC<UserSettingsFormProps> = ({ onSuccess })
               </button>
             </div>
             {passwordErrors.confirmPassword && (
-              <p className="mt-1 text-sm text-danger-600 dark:text-danger-400">{passwordErrors.confirmPassword}</p>
+              <p id="confirmPassword-error" className="mt-1 text-sm text-danger-600 dark:text-danger-400">{passwordErrors.confirmPassword}</p>
             )}
           </div>
 
           {updatePasswordError && (
-            <div className="rounded-md bg-danger-50 dark:bg-danger-900/20 p-4">
+            <div role="alert" className="rounded-md bg-danger-50 dark:bg-danger-900/20 p-4">
               <p className="text-sm text-danger-800 dark:text-danger-200">{updatePasswordError}</p>
             </div>
           )}

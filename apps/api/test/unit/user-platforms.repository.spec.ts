@@ -36,6 +36,19 @@ describe("User platform pagination and encryption key", () => {
     }));
   });
 
+  it("applies account/platform search to both rows and count while retaining user scope", async () => {
+    findMany.mockResolvedValue([{ id: "match" }]);
+    count.mockResolvedValue(21);
+    const result = await repository().findAllByUserId("owner", 2, 20, "work");
+    const where = { userId: "owner", OR: [
+      { accountName: { contains: "work" } },
+      { platform: { name: { contains: "work" } } },
+    ] };
+    expect(findMany).toHaveBeenCalledWith(expect.objectContaining({ where, skip: 20, take: 20 }));
+    expect(count).toHaveBeenCalledWith({ where });
+    expect(result).toEqual({ data: [{ id: "match" }], total: 21, hasMore: false });
+  });
+
   it.each(["a".repeat(31), "a".repeat(33), "中".repeat(32)])("rejects a key that is not 32 bytes", (key) => {
     process.env.ENCRYPTION_KEY = key;
     expect(repository).toThrow("exactly 32 bytes");

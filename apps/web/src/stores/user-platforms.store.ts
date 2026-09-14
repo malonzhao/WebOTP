@@ -6,6 +6,7 @@ import i18n from '../i18n';
 interface UserPlatformsState {
   userPlatforms: UserPlatformWithPlatform[];
   total: number;
+  search: string;
   currentPage: number;
   isLoading: boolean;
   isLoadingMore: boolean;
@@ -14,7 +15,7 @@ interface UserPlatformsState {
   refreshingPlatforms: Set<string>;
   hasMore: boolean;
   nextPage: number | null;
-  loadUserPlatforms: (page?: number, limit?: number) => Promise<void>;
+  loadUserPlatforms: (page?: number, limit?: number, search?: string) => Promise<void>;
   loadMoreUserPlatforms: (limit?: number) => Promise<void>;
   createUserPlatform: (data: CreateUserPlatformDto) => Promise<UserPlatformWithPlatform>;
   deleteUserPlatform: (id: string) => Promise<void>;
@@ -28,10 +29,12 @@ export const useUserPlatformsStore = create<UserPlatformsState>((set, get) => {
   let activeRefresh: Promise<void> | null = null;
   let generation = 0;
   let retryAt = 0;
+  let listRequest = 0;
 
   return {
     userPlatforms: [],
     total: 0,
+    search: '',
     currentPage: 1,
     isLoading: false,
     isLoadingMore: false,
@@ -41,10 +44,13 @@ export const useUserPlatformsStore = create<UserPlatformsState>((set, get) => {
     hasMore: true,
     nextPage: null,
 
-    loadUserPlatforms: async (page = 1, limit = 20) => {
-      set({ isLoading: true, error: null });
+    loadUserPlatforms: async (page = 1, limit = 20, search = get().search) => {
+      const request = ++listRequest;
+      const session = generation;
+      set({ isLoading: true, isLoadingMore: false, error: null, search });
       try {
-        const { data, total, hasMore } = await userPlatformsService.findAll(page, limit);
+        const { data, total, hasMore } = await userPlatformsService.findAll(page, limit, search);
+        if (request !== listRequest || session !== generation) return;
         set({
           userPlatforms: data,
           total,
@@ -54,6 +60,7 @@ export const useUserPlatformsStore = create<UserPlatformsState>((set, get) => {
           nextPage: hasMore ? page + 1 : null,
         });
       } catch (error: any) {
+        if (request !== listRequest || session !== generation) return;
         set({
           error: error.response?.data?.message || i18n.t('errors.loadUserPlatformsFailed'),
           isLoading: false,
@@ -63,12 +70,15 @@ export const useUserPlatformsStore = create<UserPlatformsState>((set, get) => {
 
     loadMoreUserPlatforms: async (limit = 20) => {
       const state = get();
-      if (state.isLoadingMore || !state.hasMore || state.nextPage === null) return;
+      if (state.isLoading || state.isLoadingMore || !state.hasMore || state.nextPage === null) return;
 
       const page = state.nextPage;
+      const request = listRequest;
+      const session = generation;
       set({ isLoadingMore: true, error: null });
       try {
-        const { data, total, hasMore } = await userPlatformsService.findAll(page, limit);
+        const { data, total, hasMore } = await userPlatformsService.findAll(page, limit, state.search);
+        if (request !== listRequest || session !== generation) return;
         set(currentState => ({
           userPlatforms: [...currentState.userPlatforms, ...data],
           total,
@@ -78,6 +88,7 @@ export const useUserPlatformsStore = create<UserPlatformsState>((set, get) => {
           nextPage: hasMore ? page + 1 : null,
         }));
       } catch (error: any) {
+        if (request !== listRequest || session !== generation) return;
         set({
           error: error.response?.data?.message || i18n.t('errors.loadMoreFailed'),
           isLoadingMore: false,
@@ -178,6 +189,7 @@ export const useUserPlatformsStore = create<UserPlatformsState>((set, get) => {
     }),
     resetUserPlatforms: () => {
       generation += 1;
+      listRequest += 1;
       activeRefresh = null;
       retryAt = 0;
       set({
@@ -185,6 +197,7 @@ export const useUserPlatformsStore = create<UserPlatformsState>((set, get) => {
         refreshingPlatforms: new Set(),
         userPlatforms: [],
         total: 0,
+        search: '',
         currentPage: 1,
         hasMore: true,
         nextPage: null,

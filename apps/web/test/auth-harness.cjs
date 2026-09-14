@@ -47,6 +47,7 @@ function setup(adapter, mocks = {}, globals = {}) {
   axios.defaults.adapter = previousAdapter;
   return {
     ...auth, storage, api,
+    loadPlatformsStore: () => load(path.join(src, 'stores/platforms.store.ts')).usePlatformsStore,
     loadStore: () => load(path.join(src, 'stores/user-platforms.store.ts')).useUserPlatformsStore,
     cleanup() { unregister(); delete global.localStorage; },
   };

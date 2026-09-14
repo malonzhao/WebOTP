@@ -27,7 +27,8 @@
     "no": "否",
     "ok": "确定",
     "settings": "设置",
-    "profile": "个人资料"
+    "profile": "个人资料",
+    "retry": "重试"
   },
   "auth": {
     "login": "登录",
@@ -68,8 +69,8 @@
   "dashboard": {
     "title": "OTP 管理平台",
     "platformManagement": "平台管理",
-    "bindPlatform": "绑定平台",
-    "boundPlatforms": "已绑定的平台",
+    "bindPlatform": "添加账户",
+    "boundPlatforms": "我的账户",
     "accountName": "账户名称",
     "otpSecret": "OTP 密钥",
     "selectPlatform": "请选择平台",
@@ -82,7 +83,28 @@
     "platform": "平台",
     "createdAt": "创建时间",
     "actions": "操作",
-    "clickToBind": "点击绑定新平台"
+    "clickToBind": "点击绑定新平台",
+    "subtitle": "找到所需账户，复制当前验证码。",
+    "searchAccounts": "搜索全部账户或平台",
+    "accountCount": "共 {{count}} 个账户",
+    "copiedAccount": "已复制 {{account}} 的验证码",
+    "copyFailed": "复制失败，请选择验证码后手动复制。",
+    "accountAdded": "账户已添加",
+    "deleted": "删除成功",
+    "accountActions": "{{account}} 的更多操作",
+    "copyAccount": "复制 {{account}} 的验证码",
+    "expiring": "{{count}} 秒后过期 · 即将更新",
+    "remaining": "有效期剩余 {{count}} 秒",
+    "updating": "正在更新验证码…",
+    "waitingRetry": "验证码暂不可用 · 正在自动重试",
+    "noResults": "未找到匹配的账户",
+    "trySearch": "请尝试其他账户名或平台名称。",
+    "emptyTitle": "添加第一个账户",
+    "emptyHint": "选择平台，填入其两步验证设置提供的密钥，即可获取验证码。",
+    "clearSearch": "清除搜索",
+    "loadMore": "加载更多账户",
+    "secretHint": "粘贴平台两步验证设置提供的 Base32 密钥，例如 JBSWY3DPEHPK3PXP。空格会自动移除。",
+    "deleteWarning": "此操作将从 WebOTP 移除该账户及保存的密钥，此处将无法再提供验证码。删除前请确保有其他验证器或恢复方式。"
   },
   "platforms": {
     "platformManagement": "平台管理",
@@ -102,7 +124,8 @@
     "invalidFormat": "格式不正确",
     "minLength": "至少需要{{count}}个字符",
     "maxLength": "最多{{count}}个字符",
-    "urlInvalid": "请输入有效的URL"
+    "urlInvalid": "请输入有效的URL",
+    "checkFields": "请检查以下字段"
   },
   "errors": {
     "loadPlatformsFailed": "无法加载平台列表，请稍后重试",
